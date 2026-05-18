@@ -101,7 +101,7 @@ export default function App() {
     if (Notification.permission === "default") Notification.requestPermission();
     if (Notification.permission !== "granted") return;
     const today = new Date().toISOString().slice(0, 10);
-    const todayApps = appointments.filter((a) => a.date === today);
+    const todayApps = appointments.filter((a) => a.date === today && a.status !== "completed");
     const notified = JSON.parse(sessionStorage.getItem("vet_notified") || "[]");
     todayApps.forEach((app) => {
       if (!notified.includes(app.id)) {
@@ -132,7 +132,7 @@ export default function App() {
 
   const weekFollowUps = useMemo(() => {
     const end = new Date(); end.setDate(end.getDate() + 7);
-    return appointments.filter((a) => a.date >= today && a.date <= end.toISOString().slice(0, 10)).length;
+    return appointments.filter((a) => a.date >= today && a.date <= end.toISOString().slice(0, 10) && a.status !== "completed").length;
   }, [appointments, today]);
 
   const patientHistory = useMemo(
@@ -191,11 +191,10 @@ export default function App() {
         weight: c.weight || "", debt: c.debt ?? 0,
       }));
       const visitsForDB = visits.map(({ audio, ...rest }) => ({
-        id: rest.id, name: rest.name, animal: rest.animal,
+        id: rest.id,
         date: rest.date, services: rest.services || "",
-        total: rest.total ?? 0, paid: rest.paid ?? 0, debt: rest.debt ?? 0,
+        total: Number(rest.total) || 0, paid: Number(rest.paid) || 0, debt: Number(rest.debt) || 0,
         weight: rest.weight || "", notes: rest.notes || "",
-        doctor: rest.doctor || "", status: rest.status || "",
       }));
       const appsForDB = appointments.map(a => ({
         id: a.id, name: a.name, animal: a.animal,
@@ -212,15 +211,15 @@ export default function App() {
         console.log("✅ Supabase connected — pushing data...");
         // Push each table individually and log errors
         const r1 = await supabase.from("clients").upsert(clientsForDB);
-        if (r1.error) console.error("❌ clients push error:", r1.error); else console.log("✅ clients pushed");
+        if (r1.error) console.error("❌ clients push error:", JSON.stringify(r1.error)); else console.log("✅ clients pushed");
         const r2 = await supabase.from("visits").upsert(visitsForDB);
-        if (r2.error) console.error("❌ visits push error:", r2.error); else console.log("✅ visits pushed");
+        if (r2.error) console.error("❌ visits push error:", JSON.stringify(r2.error)); else console.log("✅ visits pushed");
         const r3 = await supabase.from("appointments").upsert(appsForDB);
-        if (r3.error) console.error("❌ appointments push error:", r3.error); else console.log("✅ appointments pushed");
+        if (r3.error) console.error("❌ appointments push error:", JSON.stringify(r3.error)); else console.log("✅ appointments pushed");
         // Push services
         const servicesForDB = services.map(s => ({ id: s.id, name: s.name, price: s.price ?? 0, daily: s.daily ?? false }));
         const r4 = await supabase.from("services").upsert(servicesForDB);
-        if (r4.error) console.error("❌ services push error:", r4.error); else console.log("✅ services pushed");
+        if (r4.error) console.error("❌ services push error:", JSON.stringify(r4.error)); else console.log("✅ services pushed");
       } catch (e) {
         console.error("❌ Supabase sync crashed:", e?.message || e);
       } finally {
@@ -343,8 +342,15 @@ export default function App() {
     } finally { setSaving(false); }
   }
 
-  function completeAppointment(app) { setAppointments((p) => p.filter((a) => a.id !== app.id)); show("✅ تم إنجاز الموعد"); }
-  function deleteAppointment(id) { setAppointments((p) => p.filter((a) => a.id !== id)); show("🗑️ تم حذف الموعد"); }
+  function completeAppointment(app) {
+    setAppointments((p) => p.map((a) => a.id === app.id ? { ...a, status: "completed" } : a));
+    show("✅ تم إنجاز الموعد");
+  }
+  function deleteAppointment(id) {
+    setAppointments((p) => p.filter((a) => a.id !== id));
+    supabase.from("appointments").delete().eq("id", id).catch(() => {});
+    show("🗑️ تم حذف الموعد");
+  }
 
   function toggleTheme() {
     setTheme((p) => { const n = p === "dark" ? "light" : "dark"; localStorage.setItem("vet_theme", n); return n; });
@@ -587,7 +593,7 @@ export default function App() {
         role={role} onRoleChange={handleRoleChange}
         onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
           const end = new Date(); end.setDate(end.getDate() + 7);
-          const followUps = appointments.filter((a) => a.date >= today && a.date <= end.toISOString().slice(0, 10));
+          const followUps = appointments.filter((a) => a.date >= today && a.date <= end.toISOString().slice(0, 10) && a.status !== "completed");
           const sent = new Set();
           followUps.forEach((a) => {
             const c = clients.find((cl) => cl.name === a.name && cl.animal === a.animal);
@@ -866,7 +872,7 @@ export default function App() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <div className="lg:col-span-2"><VisitsList visits={visits} onVisitClick={setVisitDetail} /></div>
             <div className="lg:col-span-1">
-              <AppointmentsList appointments={appointments} onRemind={remindWA}
+              <AppointmentsList appointments={appointments.filter(a => a.status !== "completed")} onRemind={remindWA}
                 onComplete={completeAppointment} onDelete={deleteAppointment} />
             </div>
           </div>

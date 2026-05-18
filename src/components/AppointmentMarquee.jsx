@@ -7,7 +7,7 @@ export default function AppointmentMarquee({ appointments, onSelect }) {
   const uniqueApps = useMemo(() => {
     const seen = new Set();
     return appointments
-      .filter((a) => a.date >= today)
+      .filter((a) => a.date >= today && a.status !== "completed")
       .sort((a, b) => a.date.localeCompare(b.date))
       .filter((a) => {
         const key = `${a.name}|${a.animal}`;

@@ -8,7 +8,7 @@ export default function FloatingStats({ clients, visits, dailyRevenue, totalDebt
     const weekEnd = new Date();
     weekEnd.setDate(weekEnd.getDate() + 7);
     const endStr = weekEnd.toISOString().slice(0, 10);
-    const apps = appointments.filter((a) => a.date >= today && a.date <= endStr);
+    const apps = appointments.filter((a) => a.date >= today && a.date <= endStr && a.status !== "completed");
     const urgent = apps.filter((a) => a.date === today || a.date === new Date(Date.now() + 86400000).toISOString().slice(0, 10));
     return { total: apps.length, urgent: urgent.length };
   }, [appointments]);

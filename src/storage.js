@@ -91,7 +91,7 @@ const DEFAULTS = {
     { id: 3, name: "أحمد", animal: "لولو", date: "2026-04-28", services: "استشاره", total: 30, paid: 0, debt: 30, weight: "3.2", notes: "نحافة", doctor: "د. عبدالرحمن", status: "عليه مديونية" },
   ],
   appointments: [
-    { id: 1, name: "أحمد", animal: "لولو", date: "2026-05-18", reason: "جرعة تطعيم ثانية" },
+    { id: 1, name: "أحمد", animal: "لولو", date: "2026-05-18", reason: "جرعة تطعيم ثانية", status: "pending" },
   ],
   expenses: [],
 };
@@ -130,7 +130,7 @@ export function loadData() {
       return {
         clients: parsed.clients ?? DEFAULTS.clients,
         visits: parsed.visits ?? DEFAULTS.visits,
-        appointments: parsed.appointments ?? DEFAULTS.appointments,
+        appointments: (parsed.appointments ?? DEFAULTS.appointments).map(a => ({ ...a, status: a.status || "pending" })),
         expenses: parsed.expenses ?? DEFAULTS.expenses,
       };
     }
