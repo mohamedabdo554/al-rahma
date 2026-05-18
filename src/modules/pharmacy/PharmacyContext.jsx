@@ -20,12 +20,43 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
   const [pharmacyClients, setPharmacyClients] = useState(loadPharmacyClients);
   const [syncing, setSyncing] = useState(false);
 
-  // Disabled: Supabase pull would resurrect deleted data. localStorage is source of truth.
-
-  // Persist medicines, prescriptions, prescriptionItems to localStorage
+  // Pull from Supabase on mount — merge with local data (local wins for same id, remote fills gaps)
   useEffect(() => {
-    savePharmacyData({ medicines, prescriptions, prescriptionItems });
-  }, [medicines, prescriptions, prescriptionItems]);
+    async function pull() {
+      try {
+        setSyncing(true);
+        const [mr, pr, ir, sr, si] = await Promise.allSettled([
+          supabase.from("medicines").select("*"),
+          supabase.from("prescriptions").select("*"),
+          supabase.from("prescription_items").select("*"),
+          supabase.from("sales").select("*"),
+          supabase.from("sale_items").select("*"),
+        ]);
+        if (mr.status === "fulfilled" && mr.value.data?.length) {
+          setMedicines((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); mr.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+        if (pr.status === "fulfilled" && pr.value.data?.length) {
+          setPrescriptions((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); pr.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+        if (ir.status === "fulfilled" && ir.value.data?.length) {
+          setPrescriptionItems((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ir.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+        if (sr.status === "fulfilled" && sr.value.data?.length) {
+          setSales((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); sr.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+        if (si.status === "fulfilled" && si.value.data?.length) {
+          // sale_items aren't stored in local state, just cache for reference
+          localStorage.setItem("vet_sale_items", JSON.stringify(si.value.data));
+        }
+      } catch (e) { console.error("Pharmacy pull error:", e); } finally { setSyncing(false); }
+    }
+    pull();
+  }, []);
+
+  // Persist all pharmacy data to localStorage
+  useEffect(() => {
+    savePharmacyData({ medicines, prescriptions, prescriptionItems, sales });
+  }, [medicines, prescriptions, prescriptionItems, sales]);
 
   // Persist pharmacyClients & push to Supabase
   useEffect(() => {
@@ -48,22 +79,25 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
   }, [sales]);
 
   async function addMedicine(data) {
-    const { data: inserted, error } = await supabase
-      .from("medicines")
-      .insert({
-        name: data.name,
-        qr_code: data.qr_code || null,
-        quantity: data.quantity || 0,
-        purchase_price: data.purchase_price || 0,
-        selling_price: data.selling_price || 0,
-        wholesale_price: data.wholesale_price || 0,
-        expiration_date: data.expiration_date || null,
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    setMedicines((prev) => [...prev, inserted]);
-    return inserted;
+    const localId = "med_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+    const entry = {
+      id: localId, name: data.name,
+      qr_code: data.qr_code || null, quantity: data.quantity || 0,
+      purchase_price: data.purchase_price || 0, selling_price: data.selling_price || 0,
+      wholesale_price: data.wholesale_price || 0, expiration_date: data.expiration_date || null,
+    };
+    setMedicines((prev) => [...prev, entry]);
+    const { data: inserted, error } = await supabase.from("medicines").insert({
+      name: data.name, qr_code: data.qr_code || null, quantity: data.quantity || 0,
+      purchase_price: data.purchase_price || 0, selling_price: data.selling_price || 0,
+      wholesale_price: data.wholesale_price || 0, expiration_date: data.expiration_date || null,
+    }).select().single();
+    if (!error && inserted) {
+      setMedicines((prev) => prev.map((m) => (m.id === localId ? { ...m, id: inserted.id } : m)));
+      return inserted;
+    }
+    if (error) console.error("Supabase insert error:", error);
+    return entry;
   }
 
   async function updateMedicine(id, data) {
@@ -108,50 +142,48 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
   }
 
   async function checkout({ cart, total, prescriptionId }) {
+    const localSaleId = "sale_" + Date.now() + "_" + Math.random().toString(36).slice(2, 5);
+
+    // Always update local state first (offline-first)
+    const now = new Date().toISOString();
+    const localSale = { id: localSaleId, type: prescriptionId ? "prescription" : "otc", prescription_id: prescriptionId || null, total, created_at: now };
+    setSales((prev) => [...prev, localSale]);
+    setMedicines((prev) => {
+      const updated = [...prev];
+      cart.forEach((c) => {
+        const idx = updated.findIndex((m) => m.id === c.id);
+        if (idx !== -1) updated[idx] = { ...updated[idx], quantity: Math.max(0, updated[idx].quantity - c.qty) };
+      });
+      return updated;
+    });
+    if (prescriptionId) {
+      setPrescriptions((prev) => prev.map((p) => (p.id === prescriptionId ? { ...p, status: "dispensed" } : p)));
+    }
+
+    // Try Supabase in background
     try {
-      // 1. Insert sale into Supabase
       const { data: sale, error: se } = await supabase
         .from("sales").insert({ type: prescriptionId ? "prescription" : "otc", prescription_id: prescriptionId || null, total }).select().single();
-      if (se || !sale) throw se || new Error("no sale returned");
+      if (se || !sale) { console.error("Sale insert error:", se); return true; }
+      setSales((prev) => prev.map((s) => (s.id === localSaleId ? { ...s, id: sale.id } : s)));
 
-      // 2. Insert sale_items
       const saleItems = cart.map((c) => ({ sale_id: sale.id, medicine_id: c.id, item_name: c.name, quantity: c.qty, unit_price: c.price }));
       const { error: sie } = await supabase.from("sale_items").insert(saleItems);
-      if (sie) throw sie;
+      if (sie) console.error("Sale items error:", sie);
 
-      // 3. Decrement stock for each item
       for (const c of cart) {
         const med = medicines.find((m) => m.id === c.id);
         if (med) {
-          const newQty = Math.max(0, med.quantity - c.qty);
-          await supabase.from("medicines").update({ quantity: newQty }).eq("id", c.id);
+          await supabase.from("medicines").update({ quantity: Math.max(0, med.quantity - c.qty) }).eq("id", c.id);
         }
       }
-
-      // 4. If prescription, mark as dispensed
       if (prescriptionId) {
         await supabase.from("prescriptions").update({ status: "dispensed" }).eq("id", prescriptionId);
       }
-
-      // 5. Update local state
-      setMedicines((prev) => {
-        const updated = [...prev];
-        cart.forEach((c) => {
-          const idx = updated.findIndex((m) => m.id === c.id);
-          if (idx !== -1) updated[idx] = { ...updated[idx], quantity: Math.max(0, updated[idx].quantity - c.qty) };
-        });
-        return updated;
-      });
-      if (prescriptionId) {
-        setPrescriptions((prev) => prev.map((p) => (p.id === prescriptionId ? { ...p, status: "dispensed" } : p)));
-      }
-      setSales((prev) => [...prev, sale]);
-
-      return true;
     } catch (err) {
-      console.error("Checkout error:", err);
-      return false;
+      console.error("Checkout Supabase sync error:", err);
     }
+    return true;
   }
 
   return (

@@ -9,22 +9,98 @@ export default function InvoiceModal({
   const invoiceNum = "INV-" + Date.now().toString().slice(-6);
 
   async function exportPDF() {
-    const el = document.getElementById("premium-invoice");
-    if (!el) return;
     try {
-      el.style.direction = "rtl";
-      const c = await html2canvas(el, {
+      const wrap = document.createElement("div");
+      wrap.id = "pdf-invoice-tmp";
+      wrap.style.cssText = "position:fixed;top:0;left:0;width:210mm;background:#fff;direction:rtl;font-family:'Cairo','Segoe UI',sans-serif;z-index:-999;opacity:0;pointer-events:none;";
+      wrap.innerHTML = `
+        <div style="padding:20px 25px;direction:rtl;text-align:right;color:#0f172a;">
+          <div style="text-align:center;margin-bottom:18px;padding-bottom:14px;border-bottom:3px solid #059669;">
+            <div style="font-size:22px;font-weight:900;color:#059669;">عيادة الرحمة البيطرية</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">خلف المركز — 📞 01028423304 ${doctor ? "— 👨‍⚕️ " + doctor : ""}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;background:#f1f5f9;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;">
+            <div><div style="font-size:9px;color:#64748b;">العميل</div><div style="font-weight:700;">${client?.name || ""}</div></div>
+            <div><div style="font-size:9px;color:#64748b;">الحيوان</div><div style="font-weight:700;">${client?.animal || ""}${client?.type ? " (" + client.type + ")" : ""}</div></div>
+            ${client?.weight ? `<div><div style="font-size:9px;color:#64748b;">الوزن</div><div style="font-weight:700;">${client.weight} كجم</div></div>` : ""}
+            ${client?.phone ? `<div><div style="font-size:9px;color:#64748b;">الهاتف</div><div style="font-weight:700;direction:ltr;text-align:left;">${client.phone}</div></div>` : ""}
+            <div><div style="font-size:9px;color:#64748b;">الفاتورة</div><div style="font-weight:700;">${invoiceNum}</div></div>
+            <div><div style="font-size:9px;color:#64748b;">التاريخ</div><div style="font-weight:700;">${today}</div></div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:14px;text-align:right;">
+            <thead><tr>
+              <th style="background:#f1f5f9;padding:9px 12px;font-size:10px;color:#64748b;font-weight:700;text-align:right;border-bottom:2px solid #e2e8f0;">الخدمة</th>
+              <th style="background:#f1f5f9;padding:9px 12px;font-size:10px;color:#64748b;font-weight:700;text-align:left;width:100px;border-bottom:2px solid #e2e8f0;">السعر</th>
+            </tr></thead>
+            <tbody>
+              ${selected.map(s => `<tr>
+                <td style="padding:8px 12px;font-size:12px;font-weight:600;border-bottom:1px solid #f1f5f9;text-align:right;">${s.name}</td>
+                <td style="padding:8px 12px;font-size:12px;font-weight:700;text-align:left;border-bottom:1px solid #f1f5f9;">${s.price} ج.م</td>
+              </tr>`).join("")}
+            </tbody>
+          </table>
+          <div style="margin-right:auto;width:260px;">
+            <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #e2e8f0;">
+              <span style="color:#64748b;">الإجمالي</span><span style="font-weight:700;">${servicesTotal} ج.م</span>
+            </div>
+            ${Number(discount) > 0 ? `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #e2e8f0;color:#d97706;">
+              <span>الخصم</span><span style="font-weight:700;">-${discount} ج.م</span>
+            </div>` : ""}
+            ${Number(paid) > 0 ? `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #e2e8f0;color:#059669;">
+              <span>المدفوع</span><span style="font-weight:700;">${paid} ج.م</span>
+            </div>` : ""}
+            <div style="display:flex;justify-content:space-between;padding:8px 0 4px;font-size:16px;font-weight:900;border-top:2px solid #0f172a;margin-top:3px;">
+              <span>${remaining > 0 ? "المتبقي" : "الحالة"}</span>
+              <span style="color:${remaining > 0 ? "#dc2626" : "#059669"};">${remaining > 0 ? remaining + " ج.م" : "مدفوع بالكامل ✓"}</span>
+            </div>
+            ${method ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;text-align:left;">طريقة الدفع: ${method}</div>` : ""}
+          </div>
+          ${notes.trim() ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-top:14px;">
+            <strong style="font-size:10px;color:#d97706;display:block;margin-bottom:3px;">📋 الروشتة</strong>
+            <p style="font-size:11px;color:#92400e;line-height:1.5;margin:0;">${notes}</p>
+          </div>` : ""}
+          ${patientHistory.length > 0 ? `<div style="margin-top:14px;font-size:10px;color:#94a3b8;text-align:center;">عدد الزيارات السابقة: ${patientHistory.length}</div>` : ""}
+          <div style="text-align:center;padding:12px 0 0;margin-top:14px;border-top:1px solid #e2e8f0;font-size:9px;color:#94a3b8;">نشكركم على ثقتكم — عيادة الرحمة البيطرية 🐾</div>
+        </div>
+      `;
+      document.body.appendChild(wrap);
+
+      const canvas = await html2canvas(wrap, {
         backgroundColor: "#ffffff",
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
         allowTaint: true,
+        width: 794,
+        height: wrap.scrollHeight,
       });
-      const p = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-      const w = p.internal.pageSize.getWidth();
-      const h = (c.height * w) / c.width;
-      p.addImage(c.toDataURL("PNG"), "PNG", 0, 0, w, h);
-      p.save(`فاتورة-${invoiceNum}.pdf`);
+      document.body.removeChild(wrap);
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = pdf.internal.pageSize.getHeight();
+      const imgW = pw;
+      const imgH = (canvas.height * pw) / canvas.width;
+      if (imgH <= ph) {
+        pdf.addImage(imgData, "JPEG", 0, 0, imgW, imgH);
+      } else {
+        const pageH = (canvas.width * ph) / pw;
+        let srcY = 0;
+        let page = 0;
+        while (srcY < canvas.height) {
+          if (page > 0) pdf.addPage();
+          const chunk = document.createElement("canvas");
+          chunk.width = canvas.width;
+          chunk.height = Math.min(pageH, canvas.height - srcY);
+          const ctx = chunk.getContext("2d");
+          ctx.drawImage(canvas, 0, srcY, canvas.width, chunk.height, 0, 0, canvas.width, chunk.height);
+          pdf.addImage(chunk.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, imgW, (chunk.height * imgW) / canvas.width);
+          srcY += pageH;
+          page++;
+        }
+      }
+      pdf.save(`فاتورة-${invoiceNum}.pdf`);
     } catch (err) {
       console.error("PDF export error:", err);
       alert("حدث خطأ أثناء تصدير PDF. راجع وحدة التحكم (F12) للتفاصيل.");

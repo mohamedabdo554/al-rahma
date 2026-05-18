@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { loadData, saveData, loadServices, loadDoctors, blobToBase64, loadPharmacyData, savePharmacyData, loadPharmacyClients } from "./storage";
+import { loadData, saveData, loadServices, loadDoctors, blobToBase64, loadPharmacyData, loadPharmacyClients } from "./storage";
 import { supabase } from "./supabaseClient";
 
 import { PharmacyProvider, PharmacyDashboard } from "./modules/pharmacy";
@@ -73,7 +73,7 @@ export default function App() {
   const [financeUnlocked, setFinanceUnlocked] = useState(() => localStorage.getItem("vet_finance_unlocked") === "true");
   const [syncing, setSyncing] = useState(false);
 
-  // Pharmacy module state
+  // Pharmacy module state (initial load only — PharmacyContext manages persistence)
   const phInitial = loadPharmacyData();
   const [medicines, setMedicines] = useState(phInitial.medicines);
   const [prescriptions, setPrescriptions] = useState(phInitial.prescriptions);
@@ -81,7 +81,6 @@ export default function App() {
   const [role, setRole] = useState(() => localStorage.getItem("vet_role") || "doctor");
 
   useEffect(() => { saveData({ clients, visits, appointments, expenses }); }, [clients, visits, appointments, expenses]);
-  useEffect(() => { savePharmacyData({ medicines, prescriptions, prescriptionItems }); }, [medicines, prescriptions, prescriptionItems]);
 
   function handleRoleChange(newRole) {
     setRole(newRole);
@@ -147,18 +146,8 @@ export default function App() {
 
   const show = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); }, []);
 
-  // Merge arrays by id: local records win for same id, remote records added if id not in local
-  function mergeArrays(local, remote) {
-    const map = new Map();
-    local.forEach(item => map.set(item.id, item));
-    (remote || []).forEach(item => { if (!map.has(item.id)) map.set(item.id, item); });
-    return Array.from(map.values()).sort((a, b) => (b.id || 0) - (a.id || 0));
-  }
-
-  // Initial sync from Supabase on mount — ONLY if localStorage is empty (first ever use)
+  // Sync from Supabase on mount — merge with local data (local wins for same id, remote fills gaps)
   useEffect(() => {
-    const hasLocal = clients.length > 0 || visits.length > 0 || appointments.length > 0 || services.length > 0;
-    if (hasLocal) return;
     let cancelled = false;
     async function pull() {
       try {
@@ -170,10 +159,18 @@ export default function App() {
           supabase.from("services").select("*"),
         ]);
         if (cancelled) return;
-        if (cl.status === "fulfilled" && cl.value.data?.length) setClients(cl.value.data);
-        if (vs.status === "fulfilled" && vs.value.data?.length) setVisits(vs.value.data);
-        if (ap.status === "fulfilled" && ap.value.data?.length) setAppointments(ap.value.data);
-        if (sv.status === "fulfilled" && sv.value.data?.length) setServices(sv.value.data);
+        if (cl.status === "fulfilled" && cl.value.data?.length) {
+          setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); cl.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+        if (vs.status === "fulfilled" && vs.value.data?.length) {
+          setVisits((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); vs.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+        if (ap.status === "fulfilled" && ap.value.data?.length) {
+          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+        if (sv.status === "fulfilled" && sv.value.data?.length) {
+          setServices((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); sv.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+        }
       } catch {} finally {
         if (!cancelled) setSyncing(false);
       }
