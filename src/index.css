@@ -44,8 +44,8 @@
   --border: rgba(51, 65, 85, 0.4);
   --border-light: rgba(51, 65, 85, 0.18);
   --text: #f1f5f9;
-  --text-muted: #64748b;
-  --text-dim: #475569;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
   --glow: rgba(16, 185, 129, 0.06);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.15);
   --shadow-card-hover: 0 8px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -74,8 +74,8 @@
   --border: rgba(148, 163, 184, 0.35);
   --border-light: rgba(148, 163, 184, 0.16);
   --text: #0b1a2e;
-  --text-muted: #5b6f88;
-  --text-dim: #94a3b8;
+  --text-muted: #475569;
+  --text-dim: #334155;
   --accent: #059669;
   --accent-rgb: 5, 150, 105;
   --accent-dark: #047857;
@@ -89,9 +89,9 @@
   --danger: #dc2626;
   --danger-rgb: 220, 38, 38;
   --danger-dark: #b91c1c;
-  --warning: #d97706;
-  --warning-rgb: 217, 119, 6;
-  --warning-dark: #b45309;
+  --warning: #92400e;
+  --warning-rgb: 146, 64, 14;
+  --warning-dark: #78350f;
   --glow: rgba(5, 150, 105, 0.05);
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
   --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.04);
@@ -107,7 +107,6 @@ body {
   font-family: var(--font-primary);
   background-color: var(--bg-body);
   color: var(--text);
-  transition: background-color 0.35s ease, color 0.35s ease;
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -134,12 +133,11 @@ body::before {
   border: 1px solid var(--border);
   border-radius: 1rem;
   box-shadow: var(--shadow-card), var(--shadow-glow);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 .glass-card:hover {
   background: var(--bg-card-hover);
-  box-shadow: var(--shadow-card-hover);
-  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+  transform: translateY(-1px);
 }
 
 /* In light mode cards are solid white — no glass effect needed */
@@ -154,7 +152,7 @@ body::before {
   border: 1px solid var(--border);
   border-radius: 1.25rem;
   box-shadow: var(--shadow-card), var(--shadow-glow);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
   position: relative;
   overflow: hidden;
 }
@@ -171,7 +169,6 @@ body::before {
 }
 .card-premium:hover {
   background: var(--bg-card-hover);
-  box-shadow: var(--shadow-card-hover);
   border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
   transform: translateY(-1px);
 }
@@ -201,7 +198,6 @@ body::before {
 }
 .btn-primary:hover {
   transform: scale(1.02);
-  box-shadow: 0 6px 24px rgba(var(--accent-rgb), 0.3);
 }
 .btn-primary:active {
   transform: scale(0.97);
@@ -258,16 +254,17 @@ input::placeholder, textarea::placeholder {
 
 /* ── Animations ── */
 @keyframes breathe {
-  0%, 100% { box-shadow: 0 0 12px rgba(var(--warning-rgb), 0.08); }
-  50% { box-shadow: 0 0 28px rgba(var(--warning-rgb), 0.2); }
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 @keyframes fadeSlideUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes shimmer {
-  0% { background-position: -200% 50%; }
-  100% { background-position: 200% 50%; }
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
 }
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.4; }

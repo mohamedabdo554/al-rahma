@@ -32,6 +32,7 @@ export default function SearchBar({ clients, onSelect }) {
     <div className="mx-auto mb-4 max-w-7xl relative">
       <div className="relative">
         <input
+          aria-label="ابحث عن عميل"
           placeholder="🔍 ابحث عن عميل بالاسم / الحيوان / رقم الهاتف..."
           value={quickSearch}
           onChange={(e) => setQuickSearch(e.target.value)}

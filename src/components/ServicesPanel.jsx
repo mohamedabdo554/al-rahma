@@ -53,11 +53,11 @@ export default function ServicesPanel({
             style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>⚙️ إدارة</button>
         </div>
 
-        <input placeholder="🔍 ابحث عن خدمة..." value={searchService} onChange={(e) => setSearchService(e.target.value)}
+        <input aria-label="ابحث عن خدمة" placeholder="🔍 ابحث عن خدمة..." value={searchService} onChange={(e) => setSearchService(e.target.value)}
           className="mb-2 w-full rounded-xl border p-2 text-[11px] outline-none transition-all"
           style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
 
-        <select onChange={addFromList} defaultValue=""
+        <select aria-label="اختر الخدمة الطبية" onChange={addFromList} defaultValue=""
           className="mb-3 w-full rounded-xl border p-2.5 text-xs outline-none transition-all focus:shadow-lg"
           style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
           <option value="" disabled>— اختر خدمة —</option>
@@ -69,10 +69,10 @@ export default function ServicesPanel({
         </select>
 
         <div className="flex flex-wrap gap-2">
-          <input placeholder="خدمة مخصصة" value={customName} onChange={(e) => setCustomName(e.target.value)}
+          <input aria-label="اسم الخدمة المخصصة" placeholder="خدمة مخصصة" value={customName} onChange={(e) => setCustomName(e.target.value)}
             className="flex-1 rounded-lg border p-2 text-xs outline-none"
             style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-          <input type="number" placeholder="السعر" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)}
+          <input aria-label="سعر الخدمة" type="number" placeholder="السعر" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)}
             className="w-20 rounded-lg border p-2 text-xs outline-none"
             style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
           <motion.button whileTap={{ scale: 0.9 }} onClick={addCustom}

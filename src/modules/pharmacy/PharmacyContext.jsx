@@ -30,8 +30,8 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
           supabase.from("medicines").select("*"),
           supabase.from("prescriptions").select("*"),
           supabase.from("prescription_items").select("*"),
-          supabase.from("sales").select("*"),
-          supabase.from("sale_items").select("*"),
+          supabase.from("sales").select("*").limit(50),
+          supabase.from("sale_items").select("*").limit(50),
         ]);
         console.log("📥 Pharmacy pull results:", {
           medicines: mr.status + " " + (mr.value?.data?.length ?? 0),

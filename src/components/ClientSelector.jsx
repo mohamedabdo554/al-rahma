@@ -52,16 +52,16 @@ export default function ClientSelector({ clients, selectedClientId, onSelect, on
         <h2 className="text-xs font-bold mb-3" style={{ color: "var(--warning-dark)" }}>✏️ تعديل العميل</h2>
         <form onSubmit={handleUpdate} className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <input placeholder="الاسم" value={newName} onChange={(e) => setNewName(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-            <input placeholder="الحيوان" value={newAnimal} onChange={(e) => setNewAnimal(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <input aria-label="الاسم" placeholder="الاسم" value={newName} onChange={(e) => setNewName(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <input aria-label="الحيوان" placeholder="الحيوان" value={newAnimal} onChange={(e) => setNewAnimal(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
           </div>
           <div className="flex flex-wrap gap-2">
-            <input placeholder="رقم الهاتف" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-            <input placeholder="الوزن (كجم)" value={newWeight} onChange={(e) => setNewWeight(e.target.value)} className="w-20 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-            <select value={newType} onChange={(e) => setNewType(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
+            <input aria-label="رقم الهاتف" placeholder="رقم الهاتف" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <input aria-label="الوزن (كجم)" placeholder="الوزن (كجم)" value={newWeight} onChange={(e) => setNewWeight(e.target.value)} className="w-20 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <select aria-label="نوع الحيوان" value={newType} onChange={(e) => setNewType(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
               <option value="قطة">قطة</option><option value="كلب">كلب</option><option value="طائر">طائر</option><option value="أرنب">أرنب</option><option value="آخر">آخر</option>
             </select>
-            <select value={newGender} onChange={(e) => setNewGender(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
+            <select aria-label="الجنس" value={newGender} onChange={(e) => setNewGender(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
               <option value="ذكر">♂ ذكر</option><option value="أنثى">♀ أنثى</option>
             </select>
           </div>
@@ -95,12 +95,17 @@ export default function ClientSelector({ clients, selectedClientId, onSelect, on
       {showForm ? (
         <form onSubmit={handleSubmit} className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <input placeholder="الاسم" value={newName} onChange={(e) => setNewName(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-            <input placeholder="الحيوان" value={newAnimal} onChange={(e) => setNewAnimal(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-            <input placeholder="رقم الهاتف" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-            <input placeholder="الوزن (كجم)" value={newWeight} onChange={(e) => setNewWeight(e.target.value)} className="w-20 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
-            <select value={newType} onChange={(e) => setNewType(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
+            <input aria-label="الاسم" placeholder="الاسم" value={newName} onChange={(e) => setNewName(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <input aria-label="الحيوان" placeholder="الحيوان" value={newAnimal} onChange={(e) => setNewAnimal(e.target.value)} required className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input aria-label="رقم الهاتف" placeholder="رقم الهاتف" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="flex-1 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <input aria-label="الوزن (كجم)" placeholder="الوزن (كجم)" value={newWeight} onChange={(e) => setNewWeight(e.target.value)} className="w-20 rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+            <select aria-label="نوع الحيوان" value={newType} onChange={(e) => setNewType(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
               <option value="قطة">قطة</option><option value="كلب">كلب</option><option value="طائر">طائر</option><option value="أرنب">أرنب</option><option value="آخر">آخر</option>
+            </select>
+            <select aria-label="الجنس" value={newGender} onChange={(e) => setNewGender(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
+              <option value="ذكر">♂ ذكر</option><option value="أنثى">♀ أنثى</option>
             </select>
             <select value={newGender} onChange={(e) => setNewGender(e.target.value)} className="rounded-lg border p-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
               <option value="ذكر">♂ ذكر</option><option value="أنثى">♀ أنثى</option>
@@ -111,6 +116,7 @@ export default function ClientSelector({ clients, selectedClientId, onSelect, on
       ) : (
         <div>
           <select
+            aria-label="اختر العميل"
             value={selectedClientId}
             onChange={(e) => onSelect(e.target.value)}
             className="w-full rounded-xl border p-2.5 text-xs outline-none transition-all focus:shadow-lg"

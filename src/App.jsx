@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { loadData, saveData, loadServices, loadDoctors, blobToBase64, loadPharmacyData, loadPharmacyClients } from "./storage";
 import { supabase } from "./supabaseClient";
 
-import { PharmacyProvider, PharmacyDashboard } from "./modules/pharmacy";
+import { PharmacyProvider } from "./modules/pharmacy";
+const PharmacyDashboard = lazy(() => import("./modules/pharmacy").then(m => ({ default: m.PharmacyDashboard })));
 
 import Toast from "./components/Toast";
 import Header from "./components/Header";
@@ -12,12 +13,12 @@ import SearchBar from "./components/SearchBar";
 import ClientSelector from "./components/ClientSelector";
 import ServicesPanel from "./components/ServicesPanel";
 import InvoiceSidebar from "./components/InvoiceSidebar";
-import InvoiceModal from "./components/InvoiceModal";
-import VisitDetailModal from "./components/VisitDetailModal";
-import MedicalReport from "./components/MedicalReport";
+const InvoiceModal = lazy(() => import("./components/InvoiceModal"));
+const VisitDetailModal = lazy(() => import("./components/VisitDetailModal"));
+const MedicalReport = lazy(() => import("./components/MedicalReport"));
 import VisitHistory from "./components/VisitHistory";
-import Charts from "./components/Charts";
-import RevenueChart from "./components/RevenueChart";
+const Charts = lazy(() => import("./components/Charts"));
+const RevenueChart = lazy(() => import("./components/RevenueChart"));
 import StatsCards from "./components/StatsCards";
 import TodaySummary from "./components/TodaySummary";
 
@@ -155,8 +156,8 @@ export default function App() {
         console.log("🔄 Pulling from Supabase...");
         const [cl, vs, ap, sv] = await Promise.allSettled([
           supabase.from("clients").select("*"),
-          supabase.from("visits").select("*"),
-          supabase.from("appointments").select("*"),
+          supabase.from("visits").select("*").limit(50),
+          supabase.from("appointments").select("*").limit(30),
           supabase.from("services").select("*"),
         ]);
         if (cancelled) return;
@@ -585,7 +586,7 @@ export default function App() {
   });
 
   return (
-    <div
+    <main
       className="min-h-screen p-3 font-sans antialiased md:p-5"
       style={{ direction: "rtl" }}>
       <Toast msg={toast} />
@@ -622,9 +623,9 @@ export default function App() {
       {/* Sync status indicator */}
       <div className="fixed bottom-4 left-4 z-50 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] backdrop-blur-xl transition-all"
         style={{
-          borderColor: syncing ? "rgba(245,158,11,0.3)" : "rgba(var(--accent-rgb), 0.2)",
-          backgroundColor: syncing ? "rgba(245,158,11,0.08)" : "rgba(var(--accent-rgb), 0.06)",
-          color: syncing ? "#d97706" : "var(--accent)",
+          borderColor: syncing ? "rgba(180,83,9,0.3)" : "rgba(var(--accent-rgb), 0.2)",
+          backgroundColor: syncing ? "rgba(180,83,9,0.08)" : "rgba(var(--accent-rgb), 0.06)",
+          color: syncing ? "var(--warning)" : "var(--accent)",
         }}>
         <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncing ? "animate-pulse" : ""}`}
           style={{ backgroundColor: syncing ? "#d97706" : "var(--accent)" }} />
@@ -642,7 +643,7 @@ export default function App() {
             {client && prevDebt > 0 && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
                 className="overflow-hidden rounded-xl border p-3 text-xs flex items-center gap-2"
-                style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.06)", color: "#d97706", animation: "breathe 2s ease-in-out infinite" }}>
+                style={{ borderColor: "rgba(var(--warning-rgb), 0.35)", backgroundColor: "rgba(var(--warning-rgb), 0.06)", color: "var(--warning)", animation: "breathe 2s ease-in-out infinite" }}>
                 <span>⚠️</span>
                 <span>مديونية سابقة: <strong>{prevDebt} ج.م</strong> — تم دمجها بالفاتورة</span>
               </motion.div>
@@ -684,7 +685,9 @@ export default function App() {
           localMedicines={medicines} localPrescriptions={prescriptions} localItems={prescriptionItems}
           localSales={phInitial.sales} clients={clients} addClientDebt={addClientDebt}
           onDispense={dispensePrescription} onCompleteSale={completeSale}>
-          <PharmacyDashboard />
+          <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></div>}>
+            <PharmacyDashboard />
+          </Suspense>
         </PharmacyProvider>
       )}
 
@@ -754,7 +757,7 @@ export default function App() {
               </div>
 
               <StatsCards visits={visits} clients={clients} />
-              <RevenueChart visits={visits} />
+              <Suspense fallback={<div className="h-32" />}><RevenueChart visits={visits} /></Suspense>
 
               {/* Profit Summary */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -834,7 +837,7 @@ export default function App() {
               </div>
 
               {/* Charts */}
-              <Charts visits={visits} theme={theme} />
+              <Suspense fallback={<div className="h-48" />}><Charts visits={visits} theme={theme} /></Suspense>
 
               {/* Debtor summary cards */}
               {(() => {
@@ -858,70 +861,11 @@ export default function App() {
                   </div>
                 );
               })()}
-
-              {/* Add Client inline */}
-              <AddClientInFinance onAdd={addClient} clients={clients} />
-
-              {/* Debtors full width */}
-              <DebtorsList clients={clients} onWhatsApp={sendDebtWA} />
             </>
           )}
         </motion.div>
       )}
-
-      {/* Tab: المواعيد */}
-      {activeTab === "appointments" && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-7xl space-y-5">
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <div className="lg:col-span-2"><VisitsList visits={visits} onVisitClick={setVisitDetail} /></div>
-            <div className="lg:col-span-1">
-              <AppointmentsList appointments={appointments.filter(a => a.status !== "completed")} onRemind={remindWA}
-                onComplete={completeAppointment} onDelete={deleteAppointment} />
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Tab: التقارير */}
-      {activeTab === "reports" && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-7xl space-y-5">
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <BackupRestore onImport={handleImport} />
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      <FloatingStats clients={clients} visits={visits}
-        dailyRevenue={dailyRevenue} totalDebts={totalDebts} appointments={appointments} />
-
-      {medicalTimelineClient && (
-        <MedicalTimeline client={medicalTimelineClient} visits={visits}
-          onClose={() => setMedicalTimelineClient(null)} />
-      )}
-
-      {showInvoice && client && (
-        <InvoiceModal client={client} selected={selected} servicesTotal={servicesTotal}
-          discount={discount} paid={paid} remaining={remaining} notes={savedNotes}
-          method={method} patientHistory={patientHistory} today={today}
-          theme={theme} doctor={selectedDoctor}
-          onClose={() => { setShowInvoice(false); setSavedNotes(""); }} />
-      )}
-
-      {visitDetail && (
-        <VisitDetailModal visit={visitDetail} onClose={() => setVisitDetail(null)}
-          onMedicalReport={setReportVisit}
-          client={clients.find((c) => c.name === visitDetail.name && c.animal === visitDetail.animal)} />
-      )}
-
-      {reportVisit && (
-        <MedicalReport visit={reportVisit} onClose={() => setReportVisit(null)}
-          client={clients.find((c) => c.name === reportVisit.name && c.animal === reportVisit.animal)} />
-      )}
-    </div>
+    </main>
   );
 }
 
