@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}{{ owner.name }} - العيادة البيطرية{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="bi bi-person"></i> {{ owner.name }}</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('owners_edit', id=owner.id) }}" class="btn-glass warning"><i class="bi bi-pencil"></i> تعديل</a>
+        <a href="{{ url_for('owners_delete', id=owner.id) }}" class="btn-glass danger" onclick="return confirm('هل أنت متأكد من حذف هذا العميل وكل حيواناته؟')"><i class="bi bi-trash"></i> حذف</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card-glass">
+            <div class="card-header"><i class="bi bi-info-circle" style="color:var(--info);"></i> بيانات العميل</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">الاسم</small>
+                    <strong style="font-size:1.1rem;">{{ owner.name }}</strong>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">رقم التليفون</small>
+                    <strong dir="ltr">{{ owner.phone }}</strong>
+                </div>
+                {% if owner.address %}
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">العنوان</small>
+                    <strong>{{ owner.address }}</strong>
+                </div>
+                {% endif %}
+                <div>
+                    <small class="text-muted-c d-block">تاريخ التسجيل</small>
+                    <strong>{{ owner.created_at.strftime('%Y-%m-%d') }}</strong>
+                </div>
+                <hr style="border-color:var(--border);">
+                <div>
+                    <small class="text-muted-c d-block">إجمالي الديون</small>
+                    <strong style="font-size:1.2rem;color: {{ 'var(--danger)' if owner.total_debt and owner.total_debt > 0 else 'var(--primary)' }};">
+                        {{ "%.2f"|format(owner.total_debt or 0) }} ج
+                    </strong>
+                    {% if owner.total_debt and owner.total_debt > 0 %}
+                        <span class="badge-glass emergency d-inline-block mt-1"><i class="bi bi-exclamation-triangle"></i> دين غير مدفوع</span>
+                    {% else %}
+                        <span class="badge-glass done d-inline-block mt-1"><i class="bi bi-check-circle"></i> لا توجد ديون</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card-glass mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-paw" style="color:var(--primary);"></i> الحيوانات</span>
+                <a href="{{ url_for('animals_add', owner_id=owner.id) }}" class="btn-glass primary sm"><i class="bi bi-plus"></i> إضافة حيوان</a>
+            </div>
+            <div class="card-body p-0">
+                {% if animals %}
+                <div class="table-responsive">
+                    <table class="table-glass">
+                        <thead>
+                            <tr><th>الاسم</th><th>النوع</th><th>السلالة</th><th>العمر</th><th>الجنس</th><th>إجراءات</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for animal in animals %}
+                            <tr>
+                                <td><a href="{{ url_for('animals_view', id=animal.id) }}" style="font-weight:600;">{{ animal.name }}</a></td>
+                                <td>
+                                    <span class="badge-glass {{ 'pending' if animal.species == 'dog' else 'info' }}">
+                                        {{ 'كلب' if animal.species == 'dog' else 'قط' if animal.species == 'cat' else animal.species }}
+                                    </span>
+                                </td>
+                                <td style="color:var(--text-muted);">{{ animal.breed or '-' }}</td>
+                                <td style="color:var(--text-muted);">{{ animal.age or '-' }}</td>
+                                <td style="color:var(--text-muted);">{{ 'ذكر' if animal.gender == 'male' else 'أنثى' if animal.gender == 'female' else '-' }}</td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <a href="{{ url_for('animals_view', id=animal.id) }}" class="btn-glass sm info"><i class="bi bi-eye"></i></a>
+                                        <a href="{{ url_for('animals_delete', id=animal.id) }}" class="btn-glass sm danger" onclick="return confirm('حذف هذا الحيوان؟')"><i class="bi bi-trash"></i></a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="bi bi-paw"></i><p>لا توجد حيوانات مسجلة</p></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card-glass">
+            <div class="card-header"><i class="bi bi-calendar" style="color:var(--accent);"></i> المواعيد</div>
+            <div class="card-body p-0">
+                {% if appointments %}
+                <div class="table-responsive">
+                    <table class="table-glass">
+                        <thead>
+                            <tr><th>التاريخ</th><th>الحيوان</th><th>السبب</th><th>الحالة</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for apt in appointments %}
+                            <tr>
+                                <td style="color:var(--text);">{{ apt.appointment_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ apt.animal.name }}</td>
+                                <td style="color:var(--text-muted);">{{ apt.reason or '-' }}</td>
+                                <td>
+                                    {% if apt.status == 'pending' %}<span class="badge-glass pending">معلق</span>
+                                    {% elif apt.status == 'done' %}<span class="badge-glass done">تم</span>
+                                    {% else %}<span class="badge-glass cancelled">ملغي</span>{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="bi bi-calendar"></i><p>لا توجد مواعيد</p></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

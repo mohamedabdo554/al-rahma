@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}العملاء - العيادة البيطرية{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="bi bi-people"></i> العملاء</h2>
+    <a href="{{ url_for('owners_add') }}" class="btn-glass primary"><i class="bi bi-person-plus"></i> إضافة عميل</a>
+</div>
+
+<div class="card-glass">
+    <div class="card-body p-0">
+        {% if owners %}
+        <div class="table-responsive">
+            <table class="table-glass">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>الاسم</th>
+                        <th>رقم التليفون</th>
+                        <th>الحيوانات</th>
+                        <th>تاريخ التسجيل</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for owner in owners %}
+                    <tr>
+                        <td style="color:var(--text-dim);font-size:0.8rem;">{{ owner.id }}</td>
+                        <td><a href="{{ url_for('owners_view', id=owner.id) }}" style="font-weight:600;">{{ owner.name }}</a></td>
+                        <td><span dir="ltr" style="color:var(--text-muted);font-size:0.85rem;">{{ owner.phone }}</span></td>
+                        <td><span class="badge-glass info">{{ owner.animals|length }}</span></td>
+                        <td style="color:var(--text-muted);font-size:0.85rem;">{{ owner.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('owners_view', id=owner.id) }}" class="btn-glass sm info"><i class="bi bi-eye"></i></a>
+                                <a href="{{ url_for('owners_edit', id=owner.id) }}" class="btn-glass sm warning"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ url_for('owners_delete', id=owner.id) }}" class="btn-glass sm danger" onclick="return confirm('هل أنت متأكد من الحذف؟')"><i class="bi bi-trash"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-people"></i>
+            <p>لا يوجد عملاء بعد. <a href="{{ url_for('owners_add') }}">أضف أول عميل</a></p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

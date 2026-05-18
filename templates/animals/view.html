@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}{{ animal.name }} - العيادة البيطرية{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="bi bi-paw"></i> {{ animal.name }}</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('animals_edit', id=animal.id) }}" class="btn-glass warning"><i class="bi bi-pencil"></i> تعديل</a>
+        <a href="{{ url_for('animals_delete', id=animal.id) }}" class="btn-glass danger" onclick="return confirm('حذف هذا الحيوان؟')"><i class="bi bi-trash"></i> حذف</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card-glass">
+            <div class="card-header"><i class="bi bi-info-circle" style="color:var(--info);"></i> بيانات الحيوان</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">الاسم</small>
+                    <strong style="font-size:1.1rem;">{{ animal.name }}</strong>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">النوع</small>
+                    <span class="badge-glass {{ 'pending' if animal.species == 'dog' else 'info' }}" style="font-size:0.85rem;">
+                        {{ 'كلب' if animal.species == 'dog' else 'قط' if animal.species == 'cat' else animal.species }}
+                    </span>
+                </div>
+                {% if animal.breed %}
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">السلالة</small>
+                    <strong>{{ animal.breed }}</strong>
+                </div>
+                {% endif %}
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">العمر</small>
+                    <strong>{{ animal.age or '-' }}{% if animal.age %} سنة{% endif %}</strong>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">الجنس</small>
+                    <strong>{{ 'ذكر' if animal.gender == 'male' else 'أنثى' if animal.gender == 'female' else '-' }}</strong>
+                </div>
+                <hr style="border-color:var(--border);">
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">العميل (صاحب الحيوان)</small>
+                    <a href="{{ url_for('owners_view', id=animal.owner_id) }}" style="font-weight:600;font-size:1.05rem;">{{ animal.owner.name }}</a>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted-c d-block">تليفون العميل</small>
+                    <strong dir="ltr">{{ animal.owner.phone }}</strong>
+                </div>
+                <div>
+                    <small class="text-muted-c d-block">مسجل منذ</small>
+                    <strong>{{ animal.created_at.strftime('%Y-%m-%d') }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card-glass mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-journal-text" style="color:var(--primary);"></i> السجل الطبي — الزيارات</span>
+                <a href="{{ url_for('visits_add', animal_id=animal.id) }}" class="btn-glass primary sm"><i class="bi bi-plus"></i> تسجيل زيارة</a>
+            </div>
+            <div class="card-body">
+                {% if visits %}
+                <div class="accordion accordion-glass" id="visitsAccordion">
+                    {% for visit in visits %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#visit{{ visit.id }}">
+                                <i class="bi bi-clock-history ms-2" style="color:var(--text-muted);"></i>
+                                <strong>{{ visit.visit_date.strftime('%Y-%m-%d %H:%M') }}</strong>
+                                {% if visit.diagnosis %}
+                                <span class="me-2" style="color:var(--text-muted);font-size:0.85rem;">— {{ visit.diagnosis[:60] }}{% if visit.diagnosis|length > 60 %}...{% endif %}</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="visit{{ visit.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#visitsAccordion">
+                            <div class="accordion-body">
+                                {% if visit.diagnosis %}<div class="mb-2"><small class="text-muted-c d-block">التشخيص</small><p class="mb-1">{{ visit.diagnosis }}</p></div>{% endif %}
+                                {% if visit.treatment %}<div class="mb-2"><small class="text-muted-c d-block">العلاج</small><p class="mb-1">{{ visit.treatment }}</p></div>{% endif %}
+                                {% if visit.medications %}<div class="mb-2"><small class="text-muted-c d-block">الأدوية</small><p class="mb-1">{{ visit.medications }}</p></div>{% endif %}
+                                {% if visit.notes %}<div><small class="text-muted-c d-block">ملاحظات</small><p class="mb-0">{{ visit.notes }}</p></div>{% endif %}
+                                {% if visit.services and visit.services != '[]' %}
+                                <hr style="border-color:var(--border);">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted-c d-block"><i class="bi bi-receipt"></i> الفاتورة</small>
+                                </div>
+                                {% set svcs = visit.service_list() %}
+                                {% for svc in svcs %}
+                                <div class="d-flex justify-content-between align-items-center" style="font-size:0.85rem;padding:0.15rem 0;">
+                                    <span>{{ svc.name }}</span>
+                                    <span>{{ "%.2f"|format(svc.price) }} ج</span>
+                                </div>
+                                {% endfor %}
+                                <div style="border-top:1px solid var(--border);margin-top:0.3rem;padding-top:0.3rem;">
+                                    <div class="d-flex justify-content-between" style="font-size:0.85rem;"><span>الإجمالي</span><strong>{{ "%.2f"|format(visit.total_amount or 0) }} ج</strong></div>
+                                    <div class="d-flex justify-content-between" style="font-size:0.85rem;color:var(--primary);"><span>المدفوع</span><strong>{{ "%.2f"|format(visit.amount_paid or 0) }} ج</strong></div>
+                                    {% if visit.discount and visit.discount > 0 %}<div class="d-flex justify-content-between" style="font-size:0.85rem;color:var(--accent);"><span>الخصم</span><strong>{{ "%.2f"|format(visit.discount) }} ج</strong></div>{% endif %}
+                                    <div class="d-flex justify-content-between" style="font-size:0.85rem;color:var(--danger);"><span>المتبقي</span><strong>{{ "%.2f"|format(visit.remaining_amount or 0) }} ج</strong></div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="bi bi-journal-text"></i><p>لا توجد زيارات مسجلة. <a href="{{ url_for('visits_add', animal_id=animal.id) }}">سجل أول زيارة</a></p></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card-glass">
+            <div class="card-header"><i class="bi bi-calendar" style="color:var(--accent);"></i> المواعيد</div>
+            <div class="card-body p-0">
+                {% if appointments %}
+                <div class="table-responsive">
+                    <table class="table-glass">
+                        <thead>
+                            <tr><th>التاريخ</th><th>السبب</th><th>الحالة</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for apt in appointments %}
+                            <tr>
+                                <td>{{ apt.appointment_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td style="color:var(--text-muted);">{{ apt.reason or '-' }}</td>
+                                <td>
+                                    {% if apt.status == 'pending' %}<span class="badge-glass pending">معلق</span>
+                                    {% elif apt.status == 'done' %}<span class="badge-glass done">تم</span>
+                                    {% else %}<span class="badge-glass cancelled">ملغي</span>{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="bi bi-calendar"></i><p>لا توجد مواعيد</p></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

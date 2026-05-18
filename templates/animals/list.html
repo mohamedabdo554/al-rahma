@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block title %}الحيوانات - العيادة البيطرية{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="bi bi-paw"></i> جميع الحيوانات</h2>
+    <a href="{{ url_for('animals_add') }}" class="btn-glass primary"><i class="bi bi-plus-circle"></i> إضافة حيوان</a>
+</div>
+
+<div class="card-glass">
+    <div class="card-body p-0">
+        {% if animals %}
+        <div class="table-responsive">
+            <table class="table-glass">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>الاسم</th>
+                        <th>النوع</th>
+                        <th>السلالة</th>
+                        <th>العمر</th>
+                        <th>الجنس</th>
+                        <th>العميل</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for animal in animals %}
+                    <tr>
+                        <td style="color:var(--text-dim);font-size:0.8rem;">{{ animal.id }}</td>
+                        <td><a href="{{ url_for('animals_view', id=animal.id) }}" style="font-weight:600;">{{ animal.name }}</a></td>
+                        <td>
+                            <span class="badge-glass {{ 'pending' if animal.species == 'dog' else 'info' }}">
+                                {{ 'كلب' if animal.species == 'dog' else 'قط' if animal.species == 'cat' else animal.species }}
+                            </span>
+                        </td>
+                        <td style="color:var(--text-muted);">{{ animal.breed or '-' }}</td>
+                        <td style="color:var(--text-muted);">{{ animal.age or '-' }}</td>
+                        <td style="color:var(--text-muted);">{{ 'ذكر' if animal.gender == 'male' else 'أنثى' if animal.gender == 'female' else '-' }}</td>
+                        <td><a href="{{ url_for('owners_view', id=animal.owner_id) }}">{{ animal.owner.name }}</a></td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('animals_view', id=animal.id) }}" class="btn-glass sm info"><i class="bi bi-eye"></i></a>
+                                <a href="{{ url_for('animals_edit', id=animal.id) }}" class="btn-glass sm warning"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ url_for('animals_delete', id=animal.id) }}" class="btn-glass sm danger" onclick="return confirm('حذف هذا الحيوان؟')"><i class="bi bi-trash"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-paw"></i><p>لا توجد حيوانات مسجلة</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

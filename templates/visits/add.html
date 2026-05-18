@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block title %}تسجيل زيارة - العيادة البيطرية{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="bi bi-plus-circle"></i> زيارة جديدة + فاتورة</h2>
+</div>
+
+<div class="row g-3">
+    <!-- Main: Visit Info -->
+    <div class="col-md-7">
+        <div class="card-glass mb-3">
+            <div class="card-header">
+                <i class="bi bi-paw" style="color:var(--primary);"></i>
+                {{ animal.name }}
+                <span class="badge-glass {{ 'pending' if animal.species == 'dog' else 'info' }} me-2">
+                    {{ 'كلب' if animal.species == 'dog' else 'قط' if animal.species == 'cat' else animal.species }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted-c d-block">العميل</small>
+                        <strong>{{ animal.owner.name }}</strong>
+                        {% if animal.owner.total_debt and animal.owner.total_debt > 0 %}
+                            <span class="badge-glass emergency me-2"><i class="bi bi-exclamation-triangle"></i> عليه {{ "%.2f"|format(animal.owner.total_debt) }} ج دين سابق</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-start" dir="ltr">
+                        <small class="text-muted-c d-block">تليفون</small>
+                        <strong>{{ animal.owner.phone }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-glass">
+            <div class="card-header"><i class="bi bi-journal-text" style="color:var(--primary);"></i> تفاصيل الزيارة</div>
+            <div class="card-body">
+                <form method="POST" id="visitForm">
+                    {{ form.hidden_tag() }}
+                    <input type="hidden" name="services_json" id="services_json" value="[]">
+
+                    <div class="mb-3">
+                        {{ form.visit_date.label(class="form-label") }}
+                        {{ form.visit_date(class="form-glass form-control", type="datetime-local") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.diagnosis.label(class="form-label") }}
+                        {{ form.diagnosis(class="form-glass form-control", rows=3, placeholder="التشخيص الطبي...") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.treatment.label(class="form-label") }}
+                        {{ form.treatment(class="form-glass form-control", rows=3, placeholder="العلاج الموصى به...") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.medications.label(class="form-label") }}
+                        {{ form.medications(class="form-glass form-control", rows=2, placeholder="الأدوية الموصوفة...") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-glass form-control", rows=2, placeholder="ملاحظات إضافية...") }}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('animals_view', id=animal.id) }}" class="btn-glass">إلغاء</a>
+                        {{ form.submit(class="btn-glass primary lg flex-fill") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar: Financial Section -->
+    <div class="col-md-5">
+        <div class="card-glass">
+            <div class="card-header d-flex align-items-center gap-2" style="border-bottom-color: rgba(16,185,129,0.2);">
+                <i class="bi bi-calculator" style="color:var(--accent);font-size:1.1rem;"></i>
+                <span>نظام المحاسبة</span>
+            </div>
+            <div class="card-body">
+                <!-- Service Selector -->
+                <div class="mb-3">
+                    <label class="form-label d-flex align-items-center gap-2">
+                        <i class="bi bi-gear" style="color:var(--accent);"></i> إضافة خدمة
+                    </label>
+                    <select id="serviceSelect" class="form-glass form-control">
+                        <option value="">اختر خدمة...</option>
+                        <option value="كشف" data-price="150">كشف — 150 ج</option>
+                        <option value="تطعيم" data-price="250">تطعيم — 250 ج</option>
+                        <option value="جراحة" data-price="1500">جراحة — 1500 ج</option>
+                        <option value="سونار" data-price="300">سونار — 300 ج</option>
+                        <option value="تحليل" data-price="200">تحليل — 200 ج</option>
+                        <option value="خلع ضرس" data-price="500">خلع ضرس — 500 ج</option>
+                        <option value="علاج جلد" data-price="180">علاج جلد — 180 ج</option>
+                        <option value="متابعة" data-price="100">متابعة — 100 ج</option>
+                    </select>
+                    <button type="button" class="btn-glass primary sm mt-2 w-100" onclick="addService()">
+                        <i class="bi bi-plus-lg"></i> إضافة للفاتورة
+                    </button>
+                </div>
+
+                <!-- Services List -->
+                <div class="mb-3">
+                    <label class="form-label d-flex align-items-center gap-2">
+                        <i class="bi bi-receipt" style="color:var(--primary);"></i> الخدمات المضافة
+                    </label>
+                    <div id="servicesList" style="min-height:60px;">
+                        <div class="text-muted-c text-center py-3" id="emptyServices" style="font-size:0.85rem;">
+                            <i class="bi bi-inbox d-block mb-1" style="font-size:1.3rem;"></i>
+                            لم تضف أي خدمة بعد
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invoice Summary -->
+                <div style="border-top:1px solid var(--border);padding-top:1rem;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span style="color:var(--text-muted);"><i class="bi bi-receipt-cutoff"></i> الإجمالي</span>
+                        <strong id="totalDisplay" style="font-size:1.2rem;color:var(--text);">0.00 ج</strong>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label d-flex align-items-center gap-2">
+                            <i class="bi bi-percent" style="color:var(--accent);"></i> الخصم
+                        </label>
+                        <input type="number" id="discountInput" class="form-glass form-control" value="0" min="0" step="0.5" oninput="calcInvoice()">
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label d-flex align-items-center gap-2">
+                            <i class="bi bi-wallet2" style="color:var(--primary);"></i> المبلغ المدفوع
+                        </label>
+                        <input type="number" id="paidInput" class="form-glass form-control" value="0" min="0" step="0.5" oninput="calcInvoice()">
+                    </div>
+
+                    <div style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.1);border-radius:var(--radius-sm);padding:0.8rem;margin-top:0.5rem;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span style="color: var(--danger);"><i class="bi bi-exclamation-circle"></i> المتبقي (دين)</span>
+                            <strong id="remainingDisplay" style="font-size:1.3rem;color:var(--danger);">0.00 ج</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Owner Debt Alert -->
+        {% if animal.owner.total_debt and animal.owner.total_debt > 0 %}
+        <div class="card-glass mt-3" style="border-color:rgba(239,68,68,0.2);">
+            <div class="card-body d-flex align-items-center gap-3" style="padding:0.8rem;">
+                <i class="bi bi-exclamation-triangle-fill" style="color:var(--danger);font-size:1.5rem;"></i>
+                <div>
+                    <strong style="color:var(--danger);">ديون سابقة</strong>
+                    <div style="color:var(--text-muted);font-size:0.85rem;">هذا العميل عليه {{ "%.2f"|format(animal.owner.total_debt) }} ج ديون غير مدفوعة من زيارات سابقة</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

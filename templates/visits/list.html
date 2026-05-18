@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}الزيارات - العيادة البيطرية{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="bi bi-journal-text"></i> سجل الزيارات</h2>
+</div>
+
+<div class="card-glass">
+    <div class="card-body p-0">
+        {% if visits %}
+        <div class="table-responsive">
+            <table class="table-glass">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>التاريخ</th>
+                        <th>الحيوان</th>
+                        <th>العميل</th>
+                        <th>التشخيص</th>
+                        <th>الإجمالي</th>
+                        <th>المتبقي</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visit in visits %}
+                    <tr>
+                        <td style="color:var(--text-dim);font-size:0.8rem;">{{ visit.id }}</td>
+                        <td>{{ visit.visit_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td><a href="{{ url_for('animals_view', id=visit.animal_id) }}" style="font-weight:600;">{{ visit.animal.name }}</a></td>
+                        <td><a href="{{ url_for('owners_view', id=visit.animal.owner_id) }}">{{ visit.animal.owner.name }}</a></td>
+                        <td style="color:var(--text-muted);font-size:0.9rem;">
+                            {% if visit.diagnosis %}{{ visit.diagnosis[:60] }}{% if visit.diagnosis|length > 60 %}...{% endif %}{% else %}-{% endif %}
+                        </td>
+                        <td style="font-size:0.85rem;">{{ "%.2f"|format(visit.total_amount or 0) }} ج</td>
+                        <td>
+                            {% if visit.remaining_amount and visit.remaining_amount > 0 %}
+                                <span style="color:var(--danger);font-weight:600;">{{ "%.2f"|format(visit.remaining_amount) }} ج</span>
+                            {% else %}
+                                <span style="color:var(--primary);font-size:0.85rem;">0 ج</span>
+                            {% endif %}
+                        </td>
+                        <td><a href="{{ url_for('animals_view', id=visit.animal_id) }}" class="btn-glass sm info"><i class="bi bi-eye"></i></a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-journal-text"></i><p>لا توجد زيارات مسجلة</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{
+  "name": "عيادة الرحمة — د. محمود",
+  "short_name": "الرحمة",
+  "description": "نظام إدارة العيادة البيطرية — الزيارات، الحسابات، المواعيد",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050a14",
+  "theme_color": "#10b981",
+  "orientation": "any",
+  "dir": "rtl",
+  "lang": "ar"
+}
