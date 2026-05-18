@@ -203,10 +203,6 @@ export default function App() {
         total: Number(rest.total) || 0, paid: Number(rest.paid) || 0, debt: Number(rest.debt) || 0,
         weight: rest.weight || "", notes: rest.notes || "",
       }));
-      const appsForDB = appointments.map(a => ({
-        id: a.id, name: a.name, animal: a.animal,
-        date: a.date, time: a.time || "", reason: a.reason || "متابعة",
-      }));
       try {
         setSyncing(true);
         // Test connection with a simple GET
@@ -221,8 +217,6 @@ export default function App() {
         if (r1.error) console.error("❌ clients push error:", JSON.stringify(r1.error)); else console.log("✅ clients pushed");
         const r2 = await supabase.from("visits").upsert(visitsForDB);
         if (r2.error) console.error("❌ visits push error:", JSON.stringify(r2.error)); else console.log("✅ visits pushed");
-        const r3 = await supabase.from("appointments").upsert(appsForDB);
-        if (r3.error) console.error("❌ appointments push error:", JSON.stringify(r3.error)); else console.log("✅ appointments pushed");
         // Push services
         const servicesForDB = services.map(s => ({ id: s.id, name: s.name, price: s.price ?? 0, daily: s.daily ?? false }));
         const r4 = await supabase.from("services").upsert(servicesForDB);
@@ -234,7 +228,7 @@ export default function App() {
       }
   }, 3000);
   return () => { if (pushTimer.current) clearTimeout(pushTimer.current); };
-}, [clients, visits, appointments, services]);
+}, [clients, visits, services]);
 
   function addClient({ name, animal, type, phone, weight }) {
     const c = { id: Date.now().toString(), name, animal, type, phone, weight, debt: 0 };
@@ -338,7 +332,9 @@ export default function App() {
       setVisits((p) => [v, ...p]);
       setClients((p) => p.map((c) => (c.id === selectedClientId ? { ...c, debt, weight } : c)));
       if (followUpDate) {
-        setAppointments((p) => [{ id: Date.now(), name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة" }, ...p]);
+        const appId = Date.now();
+        setAppointments((p) => [{ id: appId, name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة" }, ...p]);
+        supabase.from("appointments").insert({ id: appId, name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة" }).then(({ error }) => { if (error) console.error("appointment insert error:", error); }).catch(() => {});
       }
       setSelected([]); setDiscount(0); setPaid(0); setNotes("");
       setVisitWeight(""); setAudioBlob(null);
@@ -350,12 +346,13 @@ export default function App() {
   }
 
   function completeAppointment(app) {
-    setAppointments((p) => p.map((a) => a.id === app.id ? { ...a, status: "completed" } : a));
+    setAppointments((p) => p.filter((a) => a.id !== app.id));
+    supabase.from("appointments").delete().eq("id", app.id).then(({ error }) => { if (error) console.error("🗑️ delete FAILED:", error); else console.log("🗑️ delete OK, id:", app.id); }).catch(e => console.error("🗑️ delete NETWORK error:", e));
     show("✅ تم إنجاز الموعد");
   }
   function deleteAppointment(id) {
     setAppointments((p) => p.filter((a) => a.id !== id));
-    supabase.from("appointments").delete().eq("id", id).catch(() => {});
+    supabase.from("appointments").delete().eq("id", id).then(({ error }) => { if (error) console.error("🗑️ delete FAILED:", error); else console.log("🗑️ delete OK, id:", id); }).catch(e => console.error("🗑️ delete NETWORK error:", e));
     show("🗑️ تم حذف الموعد");
   }
 
