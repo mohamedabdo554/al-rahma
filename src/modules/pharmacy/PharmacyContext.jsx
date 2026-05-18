@@ -25,6 +25,7 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
     async function pull() {
       try {
         setSyncing(true);
+        console.log("🔄 Pharmacy pulling...");
         const [mr, pr, ir, sr, si] = await Promise.allSettled([
           supabase.from("medicines").select("*"),
           supabase.from("prescriptions").select("*"),
@@ -32,20 +33,26 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
           supabase.from("sales").select("*"),
           supabase.from("sale_items").select("*"),
         ]);
+        console.log("📥 Pharmacy pull results:", {
+          medicines: mr.status + " " + (mr.value?.data?.length ?? 0),
+          prescriptions: pr.status + " " + (pr.value?.data?.length ?? 0),
+          prescriptionItems: ir.status + " " + (ir.value?.data?.length ?? 0),
+          sales: sr.status + " " + (sr.value?.data?.length ?? 0),
+          saleItems: si.status + " " + (si.value?.data?.length ?? 0),
+        });
         if (mr.status === "fulfilled" && mr.value.data?.length) {
-          setMedicines((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); mr.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setMedicines((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = mr.value.data.filter(i => !m.has(i.id)); console.log("➕ merged medicines:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
         if (pr.status === "fulfilled" && pr.value.data?.length) {
-          setPrescriptions((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); pr.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setPrescriptions((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = pr.value.data.filter(i => !m.has(i.id)); console.log("➕ merged prescriptions:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
         if (ir.status === "fulfilled" && ir.value.data?.length) {
-          setPrescriptionItems((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ir.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setPrescriptionItems((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = ir.value.data.filter(i => !m.has(i.id)); console.log("➕ merged prescriptionItems:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
         if (sr.status === "fulfilled" && sr.value.data?.length) {
-          setSales((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); sr.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setSales((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = sr.value.data.filter(i => !m.has(i.id)); console.log("➕ merged sales:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
         if (si.status === "fulfilled" && si.value.data?.length) {
-          // sale_items aren't stored in local state, just cache for reference
           localStorage.setItem("vet_sale_items", JSON.stringify(si.value.data));
         }
       } catch (e) { console.error("Pharmacy pull error:", e); } finally { setSyncing(false); }

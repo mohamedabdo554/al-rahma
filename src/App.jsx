@@ -152,6 +152,7 @@ export default function App() {
     async function pull() {
       try {
         setSyncing(true);
+        console.log("🔄 Pulling from Supabase...");
         const [cl, vs, ap, sv] = await Promise.allSettled([
           supabase.from("clients").select("*"),
           supabase.from("visits").select("*"),
@@ -159,19 +160,25 @@ export default function App() {
           supabase.from("services").select("*"),
         ]);
         if (cancelled) return;
+        console.log("📥 Pull results:", {
+          clients: cl.status + " " + (cl.value?.data?.length ?? 0) + " rows",
+          visits: vs.status + " " + (vs.value?.data?.length ?? 0) + " rows",
+          appointments: ap.status + " " + (ap.value?.data?.length ?? 0) + " rows",
+          services: sv.status + " " + (sv.value?.data?.length ?? 0) + " rows",
+        });
         if (cl.status === "fulfilled" && cl.value.data?.length) {
-          setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); cl.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = cl.value.data.filter(i => !m.has(i.id)); console.log("➕ merged clients:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
         if (vs.status === "fulfilled" && vs.value.data?.length) {
-          setVisits((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); vs.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setVisits((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = vs.value.data.filter(i => !m.has(i.id)); console.log("➕ merged visits:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
         if (ap.status === "fulfilled" && ap.value.data?.length) {
-          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = ap.value.data.filter(i => !m.has(i.id)); console.log("➕ merged appointments:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
         if (sv.status === "fulfilled" && sv.value.data?.length) {
-          setServices((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); sv.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); }); return Array.from(m.values()); });
+          setServices((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = sv.value.data.filter(i => !m.has(i.id)); console.log("➕ merged services:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
-      } catch {} finally {
+      } catch (e) { console.error("❌ Pull error:", e); } finally {
         if (!cancelled) setSyncing(false);
       }
     }
