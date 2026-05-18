@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 
 export default function InvoiceModal({
   client, selected, servicesTotal, discount, paid, remaining,
-  notes, method, patientHistory, today, theme, onClose,
+  notes, method, patientHistory, today, theme, onClose, doctor,
 }) {
   const invoiceNum = "INV-" + Date.now().toString().slice(-6);
 
@@ -12,12 +12,23 @@ export default function InvoiceModal({
     const el = document.getElementById("premium-invoice");
     if (!el) return;
     try {
-      const c = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2 });
-      const p = new jsPDF("p", "mm", "a4");
+      el.style.direction = "rtl";
+      const c = await html2canvas(el, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: true,
+      });
+      const p = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
       const w = p.internal.pageSize.getWidth();
-      p.addImage(c.toDataURL("PNG"), "PNG", 0, 0, w, (c.height * w) / c.width);
+      const h = (c.height * w) / c.width;
+      p.addImage(c.toDataURL("PNG"), "PNG", 0, 0, w, h);
       p.save(`فاتورة-${invoiceNum}.pdf`);
-    } catch {}
+    } catch (err) {
+      console.error("PDF export error:", err);
+      alert("حدث خطأ أثناء تصدير PDF. راجع وحدة التحكم (F12) للتفاصيل.");
+    }
   }
 
   function handlePrint() {
@@ -28,6 +39,7 @@ export default function InvoiceModal({
     win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>فاتورة ${invoiceNum}</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+      @page { margin: 8mm; size: A4; }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font-family: 'Cairo', sans-serif; background: #f8fafc; color: #0f172a; padding: 0; direction: rtl; }
       .invoice-wrap { max-width: 210mm; margin: 0 auto; background: #fff; min-height: 297mm; position: relative; }
@@ -88,10 +100,11 @@ export default function InvoiceModal({
             <div className="relative z-10 flex justify-between items-start">
               <div>
                 <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>عيادة الرحمة البيطرية</div>
-                <div style={{ fontSize: 11, opacity: 0.85, color: "#fff", marginTop: 2 }}>خلف المركز — مركز طفيليات منصور</div>
+                <div style={{ fontSize: 11, opacity: 0.85, color: "#fff", marginTop: 2 }}>خلف المركز</div>
                 <div className="flex gap-4 mt-2 text-[10px]" style={{ opacity: 0.7, color: "#fff" }}>
                   <span>📍 خلف المركز</span>
-                  <span>📞 01001234567</span>
+                  <span>📞 01028423304</span>
+                  {doctor && <span>👨‍⚕️ {doctor}</span>}
                 </div>
               </div>
               <div style={{ textAlign: "left" }}>
@@ -182,7 +195,7 @@ export default function InvoiceModal({
             {/* Notes */}
             {notes.trim() && (
               <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 16px", marginTop: 16 }}>
-                <strong style={{ fontSize: 11, color: "#d97706", display: "block", marginBottom: 4 }}>📋 ملاحظات طبية</strong>
+                <strong style={{ fontSize: 11, color: "#d97706", display: "block", marginBottom: 4 }}>📋 الروشتة</strong>
                 <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.6, margin: 0 }}>{notes}</p>
               </div>
             )}

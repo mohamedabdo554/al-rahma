@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { loadData, saveData, loadServices, loadDoctors, blobToBase64, loadPharmacyData, savePharmacyData } from "./storage";
+import { loadData, saveData, loadServices, loadDoctors, blobToBase64, loadPharmacyData, savePharmacyData, loadPharmacyClients } from "./storage";
 import { supabase } from "./supabaseClient";
 
 import { PharmacyProvider, PharmacyDashboard } from "./modules/pharmacy";
@@ -55,10 +55,11 @@ export default function App() {
   const [followUpTime, setFollowUpTime] = useState("");
   const [followUpReason, setFollowUpReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [savedNotes, setSavedNotes] = useState("");
   const [visitWeight, setVisitWeight] = useState("");
   const [audioBlob, setAudioBlob] = useState(null);
   const [toast, setToast] = useState(null);
-  const [theme, setTheme] = useState(() => localStorage.getItem("vet_theme") || "dark");
+  const [theme, setTheme] = useState(() => localStorage.getItem("vet_theme") || "light");
   const [showInvoice, setShowInvoice] = useState(false);
   const [visitDetail, setVisitDetail] = useState(null);
   const [reportVisit, setReportVisit] = useState(null);
@@ -67,7 +68,7 @@ export default function App() {
   const [medicalTimelineClient, setMedicalTimelineClient] = useState(null);
 
   const [doctors, setDoctors] = useState(() => loadDoctors());
-  const [selectedDoctor, setSelectedDoctor] = useState(doctors[0] || "د. محمود");
+  const [selectedDoctor, setSelectedDoctor] = useState(doctors[0] || "د. عبدالرحمن");
   const [expenses, setExpenses] = useState(initial.expenses || []);
   const [financeUnlocked, setFinanceUnlocked] = useState(() => localStorage.getItem("vet_finance_unlocked") === "true");
   const [syncing, setSyncing] = useState(false);
@@ -154,8 +155,10 @@ export default function App() {
     return Array.from(map.values()).sort((a, b) => (b.id || 0) - (a.id || 0));
   }
 
-  // Initial sync from Supabase on mount (offline-first: localStorage already loaded, merge cloud data)
+  // Initial sync from Supabase on mount — ONLY if localStorage is empty (first ever use)
   useEffect(() => {
+    const hasLocal = clients.length > 0 || visits.length > 0 || appointments.length > 0 || services.length > 0;
+    if (hasLocal) return;
     let cancelled = false;
     async function pull() {
       try {
@@ -167,21 +170,11 @@ export default function App() {
           supabase.from("services").select("*"),
         ]);
         if (cancelled) return;
-        if (cl.status === "fulfilled" && cl.value.data?.length) {
-          setClients(prev => mergeArrays(prev, cl.value.data));
-        }
-        if (vs.status === "fulfilled" && vs.value.data?.length) {
-          setVisits(prev => mergeArrays(prev, vs.value.data));
-        }
-        if (ap.status === "fulfilled" && ap.value.data?.length) {
-          setAppointments(prev => mergeArrays(prev, ap.value.data));
-        }
-        if (sv.status === "fulfilled" && sv.value.data?.length) {
-          setServices(prev => mergeArrays(prev, sv.value.data));
-        }
-      } catch {
-        // offline — silently use localStorage data
-      } finally {
+        if (cl.status === "fulfilled" && cl.value.data?.length) setClients(cl.value.data);
+        if (vs.status === "fulfilled" && vs.value.data?.length) setVisits(vs.value.data);
+        if (ap.status === "fulfilled" && ap.value.data?.length) setAppointments(ap.value.data);
+        if (sv.status === "fulfilled" && sv.value.data?.length) setServices(sv.value.data);
+      } catch {} finally {
         if (!cancelled) setSyncing(false);
       }
     }
@@ -327,16 +320,18 @@ export default function App() {
       const svc = normSep(selected.map((s) => s.qty && s.qty > 1 ? `${s.name} × ${s.qty} أيام` : s.name).join("، ")) || "كشف";
       const debt = Math.max(0, remaining);
       const weight = visitWeight || client?.weight || "";
+      const savedNotesTrim = notes.trim();
       let audioBase64 = null;
       if (audioBlob) audioBase64 = await blobToBase64(audioBlob);
 
       const v = {
         id: Date.now(), name: client.name, animal: client.animal, date: today,
         services: svc, total: servicesTotal, paid: Number(paid), debt,
-        weight, notes: notes.trim(), audio: audioBase64,
+        weight, notes: savedNotesTrim, audio: audioBase64,
         doctor: selectedDoctor,
         status: debt <= 0 ? "مدفوع بالكامل ✓" : "عليه مديونية",
       };
+      setSavedNotes(savedNotesTrim);
       setVisits((p) => [v, ...p]);
       setClients((p) => p.map((c) => (c.id === selectedClientId ? { ...c, debt, weight } : c)));
       if (followUpDate) {
@@ -412,6 +407,36 @@ export default function App() {
     rows.push(["التاريخ", "الوقت", "الاسم", "الأليف", "السبب"].join(","));
     appointments.forEach((a) => {
       rows.push([a.date, a.time || "", a.name, a.animal, a.reason || ""].map(escCSV).join(","));
+    });
+
+    rows.push("");
+
+    // Section 4: pharmacy medicines
+    const phData = loadPharmacyData();
+    rows.push("المخزون — الأدوية");
+    rows.push(["الاسم", "الباركود", "الكمية", "سعر الشراء", "سعر البيع", "سعر الجملة", "تاريخ الصلاحية"].join(","));
+    (phData.medicines || []).forEach((m) => {
+      rows.push([m.name, m.qr_code || "", m.quantity ?? 0, m.purchase_price ?? 0, m.selling_price ?? 0, m.wholesale_price ?? 0, m.expiration_date || ""].map(escCSV).join(","));
+    });
+
+    rows.push("");
+
+    // Section 5: pharmacy sales
+    rows.push("المبيعات — الصيدلية");
+    rows.push(["التاريخ", "نوع", "الإجمالي"].join(","));
+    (phData.sales || []).forEach((s) => {
+      const d = s.created_at ? s.created_at.slice(0, 10) : "";
+      rows.push([d, s.type || "", s.total ?? 0].map(escCSV).join(","));
+    });
+
+    rows.push("");
+
+    // Section 6: pharmacy clients
+    const phClients = loadPharmacyClients();
+    rows.push("عملاء الصيدلية");
+    rows.push(["الاسم", "الهاتف", "المديونية"].join(","));
+    phClients.forEach((c) => {
+      rows.push([c.name, c.phone || "", c.debt ?? 0].map(escCSV).join(","));
     });
 
     const csv = BOM + rows.join("\r\n");
@@ -525,7 +550,7 @@ export default function App() {
       const tag = document.activeElement?.tagName;
       const isInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
       if (e.key === "Escape") {
-        if (showInvoice) { setShowInvoice(false); return; }
+        if (showInvoice) { setShowInvoice(false); setSavedNotes(""); return; }
         if (visitDetail) { setVisitDetail(null); return; }
         if (reportVisit) { setReportVisit(null); return; }
       }
@@ -873,9 +898,10 @@ export default function App() {
 
       {showInvoice && client && (
         <InvoiceModal client={client} selected={selected} servicesTotal={servicesTotal}
-          discount={discount} paid={paid} remaining={remaining} notes={notes}
+          discount={discount} paid={paid} remaining={remaining} notes={savedNotes}
           method={method} patientHistory={patientHistory} today={today}
-          theme={theme} onClose={() => setShowInvoice(false)} />
+          theme={theme} doctor={selectedDoctor}
+          onClose={() => { setShowInvoice(false); setSavedNotes(""); }} />
       )}
 
       {visitDetail && (

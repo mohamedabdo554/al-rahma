@@ -150,7 +150,7 @@ export default function VisitDetailModal({ visit, client, onClose, onMedicalRepo
           {visit.notes && (
             <div>
               <h4 className="text-[10px] font-bold mb-2 flex items-center gap-1.5" style={{ color: "var(--warning-dark)" }}>
-                <span>📝</span> روشتة
+                <span>📋</span> الروشتة
               </h4>
               <div
                 className="rounded-xl border p-3 text-xs leading-relaxed"

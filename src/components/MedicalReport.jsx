@@ -8,6 +8,7 @@ export default function MedicalReport({ visit, client, onClose }) {
     win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>تقرير طبي</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+      @page { margin: 8mm; size: A4; }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font-family: 'Cairo', sans-serif; background: #fff; color: #0f172a; padding: 40px; direction: rtl; }
       .header { text-align: center; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #059669; }
@@ -46,9 +47,9 @@ export default function MedicalReport({ visit, client, onClose }) {
       </div>
       ${visit.paid > 0 ? `<div style="font-size:13px;display:flex;justify-content:space-between;max-width:300px;color:#059669;"><span>المدفوع:</span><span style="font-weight:700;">${visit.paid} ج.م</span></div>` : ""}
       ${visit.debt > 0 ? `<div style="font-size:13px;display:flex;justify-content:space-between;max-width:300px;color:#dc2626;"><span>المتبقي:</span><span style="font-weight:700;">${visit.debt} ج.م</span></div>` : ""}
-      ${visit.notes ? `<div class="notes-box"><strong>📋 روشتة / ملاحظات طبية</strong><p>${visit.notes}</p></div>` : ""}
+      ${visit.notes ? `<div class="notes-box"><strong>📋 الروشتة</strong><p>${visit.notes}</p></div>` : ""}
       <div class="footer">عيادة الرحمة للطب البيطري — نشكركم على ثقتكم 🐾</div>
-      <script>window.print();window.close();<\/script>
+      <script>try{window.print()}catch(e){console.error("Print error:",e)}<\/script>
     </body></html>`);
     win.document.close();
   }

@@ -136,8 +136,8 @@ export default function PharmacyDashboard() {
   const [subTab, setSubTab] = useState("pos");
   const [financeUnlocked, setFinanceUnlocked] = useState(() => localStorage.getItem("vet_ph_finance_unlocked") === "true");
   function unlockFinance() {
-    const p = prompt("🔒 أدخل كلمة المرور:");
-    if (p === "1234") { setFinanceUnlocked(true); localStorage.setItem("vet_ph_finance_unlocked", "true"); }
+    const p = prompt("🔒 أدخل كلمة المرور للمالية:");
+    if (p === "1234") { setFinanceUnlocked(true); setSubTab("finance"); localStorage.setItem("vet_ph_finance_unlocked", "true"); }
     else alert("❌ كلمة المرور خطأ");
   }
   function lockFinance() {
@@ -152,6 +152,28 @@ export default function PharmacyDashboard() {
   const [invSearch, setInvSearch] = useState("");
   const [invoiceDetail, setInvoiceDetail] = useState(null);
   const [invItems, setInvItems] = useState([]);
+
+  function exportPharmacy() {
+    const BOM = "\uFEFF";
+    const escCSV = (v) => { const s = String(v ?? ""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; };
+    const rows = [];
+    rows.push("المخزون — الأدوية");
+    rows.push(["الاسم", "الباركود", "الكمية", "سعر الشراء", "سعر البيع", "سعر الجملة", "تاريخ الصلاحية"].join(","));
+    medicines.forEach((m) => rows.push([m.name, m.qr_code || "", m.quantity ?? 0, m.purchase_price ?? 0, m.selling_price ?? 0, m.wholesale_price ?? 0, m.expiration_date || ""].map(escCSV).join(",")));
+    rows.push("");
+    rows.push("المبيعات");
+    rows.push(["التاريخ", "النوع", "الإجمالي"].join(","));
+    sales.forEach((s) => rows.push([(s.created_at || "").slice(0, 10), s.type || "", s.total ?? 0].map(escCSV).join(",")));
+    rows.push("");
+    rows.push("عملاء الصيدلية");
+    rows.push(["الاسم", "الهاتف", "المديونية"].join(","));
+    pharmacyClients.forEach((c) => rows.push([c.name, c.phone || "", c.debt ?? 0].map(escCSV).join(",")));
+    const csv = BOM + rows.join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;header=present" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `pharmacy-backup-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
   const [loadingInv, setLoadingInv] = useState(false);
 
   async function showInvoice(sale) {
@@ -303,11 +325,18 @@ export default function PharmacyDashboard() {
           <motion.div key="finance" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold" style={{ color: "var(--accent2)" }}>💰 مالية الصيدلية</span>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={lockFinance}
-                className="rounded-lg border px-2 py-1 text-[9px]"
-                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-                🔒 إغلاق
-              </motion.button>
+              <div className="flex gap-1">
+                <motion.button whileTap={{ scale: 0.9 }} onClick={exportPharmacy}
+                  className="rounded-lg border px-2 py-1 text-[9px]"
+                  style={{ borderColor: "rgba(var(--accent-rgb), 0.3)", color: "var(--accent)" }}>
+                  📥 تصدير
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={lockFinance}
+                  className="rounded-lg border px-2 py-1 text-[9px]"
+                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                  🔒 إغلاق
+                </motion.button>
+              </div>
             </div>
             {/* Add pharmacy client */}
             <PharmaAddClient onAdd={addPharmacyClient} />

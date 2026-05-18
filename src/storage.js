@@ -86,9 +86,9 @@ const DEFAULTS = {
     { id: "3", name: "يوسف", animal: "مشمش", type: "قطة", gender: "ذكر", phone: "", weight: "", debt: 180 },
   ],
   visits: [
-    { id: 1, name: "أحمد", animal: "لولو", date: "2026-05-15", services: "كشف", total: 80, paid: 0, debt: 80, weight: "3.5", notes: "", doctor: "د. محمود", status: "عليه مديونية" },
+    { id: 1, name: "أحمد", animal: "لولو", date: "2026-05-15", services: "كشف", total: 80, paid: 0, debt: 80, weight: "3.5", notes: "", doctor: "د. عبدالرحمن", status: "عليه مديونية" },
     { id: 2, name: "محمد", animal: "ريكس", date: "2026-05-14", services: "متابعه", total: 20, paid: 20, debt: 0, weight: "12", notes: "صحة جيدة", doctor: "د. عبدالرحمن", status: "مدفوع بالكامل ✓" },
-    { id: 3, name: "أحمد", animal: "لولو", date: "2026-04-28", services: "استشاره", total: 30, paid: 0, debt: 30, weight: "3.2", notes: "نحافة", doctor: "د. محمود", status: "عليه مديونية" },
+    { id: 3, name: "أحمد", animal: "لولو", date: "2026-04-28", services: "استشاره", total: 30, paid: 0, debt: 30, weight: "3.2", notes: "نحافة", doctor: "د. عبدالرحمن", status: "عليه مديونية" },
   ],
   appointments: [
     { id: 1, name: "أحمد", animal: "لولو", date: "2026-05-18", reason: "جرعة تطعيم ثانية" },
@@ -183,4 +183,8 @@ export function savePharmacyData(data) {
   try {
     localStorage.setItem(PHARMACY_KEY, JSON.stringify(data));
   } catch { /* ignore */ }
+}
+
+export function loadPharmacyClients() {
+  try { return JSON.parse(localStorage.getItem("vet_pharmacy_clients")) || []; } catch { return []; }
 }

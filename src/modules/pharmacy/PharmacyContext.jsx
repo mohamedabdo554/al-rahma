@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
+import { savePharmacyData } from "../../storage";
 
 const PHARMACY_CLIENTS_KEY = "vet_pharmacy_clients";
 function loadPharmacyClients() {
@@ -19,28 +20,12 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
   const [pharmacyClients, setPharmacyClients] = useState(loadPharmacyClients);
   const [syncing, setSyncing] = useState(false);
 
-  // Sync from Supabase on mount
+  // Disabled: Supabase pull would resurrect deleted data. localStorage is source of truth.
+
+  // Persist medicines, prescriptions, prescriptionItems to localStorage
   useEffect(() => {
-    (async () => {
-      try {
-        setSyncing(true);
-        const [mr, pr, ir, pcr, sr] = await Promise.allSettled([
-          supabase.from("medicines").select("*"),
-          supabase.from("prescriptions").select("*"),
-          supabase.from("prescription_items").select("*"),
-          supabase.from("pharmacy_clients").select("*"),
-          supabase.from("sales").select("*"),
-        ]);
-        if (mr.status === "fulfilled" && mr.value.data?.length) setMedicines(mr.value.data);
-        if (pr.status === "fulfilled" && pr.value.data?.length) setPrescriptions(pr.value.data);
-        if (ir.status === "fulfilled" && ir.value.data?.length) setPrescriptionItems(ir.value.data);
-        if (pcr.status === "fulfilled" && pcr.value.data?.length) setPharmacyClients(pcr.value.data);
-        if (sr.status === "fulfilled" && sr.value.data?.length) setSales(sr.value.data);
-      } catch {} finally {
-        setSyncing(false);
-      }
-    })();
-  }, []);
+    savePharmacyData({ medicines, prescriptions, prescriptionItems });
+  }, [medicines, prescriptions, prescriptionItems]);
 
   // Persist pharmacyClients & push to Supabase
   useEffect(() => {
@@ -83,13 +68,14 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
 
   async function updateMedicine(id, data) {
     const { error } = await supabase.from("medicines").update(data).eq("id", id);
-    if (error) throw error;
     setMedicines((prev) => prev.map((m) => (m.id === id ? { ...m, ...data } : m)));
+    if (error) console.error("Supabase update error:", error);
   }
 
   async function deleteMedicine(id) {
-    await supabase.from("medicines").delete().eq("id", id);
+    const { error } = await supabase.from("medicines").delete().eq("id", id);
     setMedicines((prev) => prev.filter((m) => m.id !== id));
+    if (error) console.error("Supabase delete error:", error);
   }
 
   function lookupQR(code) {

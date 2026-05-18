@@ -108,7 +108,7 @@ export default function InvoiceSidebar({
 
         {/* Medical Notes */}
         <div>
-          <label className="mb-1.5 flex items-center gap-1 text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>📝 روشتة / ملاحظات طبية</label>
+          <label className="mb-1.5 flex items-center gap-1 text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>            📋 الروشتة</label>
           <textarea placeholder="التشخيص، الأدوية، الجرعات..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
             className="w-full rounded-xl border p-2.5 text-xs outline-none resize-none transition-all"
             style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)" }} />
