@@ -1187,9 +1187,9 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => remindWA(a)} className="rounded-md border px-1.5 py-0.5 text-[9px]" style={{ borderColor: "rgba(var(--accent-rgb), 0.2)", color: "var(--accent)" }}>📱</button>
-                  <button onClick={() => completeAppointment(a)} className="rounded-md border px-1.5 py-0.5 text-[9px]" style={{ borderColor: "rgba(var(--accent-rgb), 0.2)", color: "var(--accent)" }}>✓</button>
-                  <button onClick={() => deleteAppointment(a.id)} className="rounded-md border px-1.5 py-0.5 text-[9px]" style={{ borderColor: "rgba(var(--danger-rgb), 0.2)", color: "var(--danger)" }}>✕</button>
+                  <button onClick={() => remindWA(a)} className="rounded-md border px-1.5 py-0.5 text-[9px] font-bold" style={{ borderColor: "var(--accent)", color: "var(--accent-dark)" }}>📱</button>
+                  <button onClick={() => completeAppointment(a)} className="rounded-md border px-1.5 py-0.5 text-[9px] font-bold" style={{ borderColor: "var(--accent)", color: "var(--accent-dark)" }}>✓</button>
+                  <button onClick={() => deleteAppointment(a.id)} className="rounded-md border px-1.5 py-0.5 text-[9px] font-bold" style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>✕</button>
                 </div>
               </div>
             ))}
@@ -1274,7 +1274,7 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
               <motion.button whileTap={{ scale: 0.95 }}
                 onClick={() => addFollowUpOnly(quickFUClient.name, quickFUClient.animal)}
                 className="flex-1 rounded-xl py-2.5 text-xs font-bold text-white transition-all hover:shadow-lg"
-                style={{ background: "linear-gradient(135deg, var(--info), var(--info-dark))" }}>
+                style={{ background: "linear-gradient(135deg, #6366f1, #4338ca)" }}>
                 ✅ تأكيد المتابعة
               </motion.button>
               <motion.button whileTap={{ scale: 0.95 }}
