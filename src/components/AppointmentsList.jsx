@@ -70,8 +70,8 @@ export default function AppointmentsList({ appointments, onRemind, onComplete, o
                       <motion.button
                         whileTap={{ scale: 0.85 }}
                         onClick={() => onComplete(a)}
-                        className="rounded-lg border px-2 py-1 text-[9px] font-medium transition-all"
-                        style={{ borderColor: "rgba(16,185,129,0.2)", color: "var(--accent)" }}
+                        className="rounded-lg border px-2 py-1 text-[9px] font-bold transition-all"
+                        style={{ borderColor: "rgba(var(--accent-rgb), 0.35)", color: "var(--accent-dark)" }}
                       >
                         ✓
                       </motion.button>

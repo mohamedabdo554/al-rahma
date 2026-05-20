@@ -79,6 +79,7 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [financeUnlocked, setFinanceUnlocked] = useState(() => localStorage.getItem("vet_finance_unlocked") === "true");
   const [syncing, setSyncing] = useState(false);
+  const [showApptWidget, setShowApptWidget] = useState(() => localStorage.getItem("vet_appt_widget") !== "0");
 
   // Pharmacy module state (initial load only — PharmacyContext manages persistence)
   const phInitial = loadPharmacyData();
@@ -776,7 +777,6 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
               onPriceChange={changePrice} onQtyChange={changeQty} onUndo={undoLast}
               onServicesChange={setServices} />
 
-            <AppointmentsList appointments={appointments} onRemind={remindWA} onComplete={completeAppointment} onDelete={deleteAppointment} />
             <VisitHistory client={client} visits={visits} onVisitClick={setVisitDetail}
               onTimeline={client ? () => setMedicalTimelineClient(client) : null} />
             {client && (
@@ -1152,6 +1152,66 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
             <Charts visits={visits} theme={theme} />
           </Suspense>
         </div>
+      )}
+
+      {/* Floating appointments widget */}
+      {showApptWidget && appointments.length > 0 && (
+        <motion.div
+          initial={{ y: 60, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 60, opacity: 0 }}
+          className="fixed bottom-20 right-4 z-40 w-72 rounded-2xl border shadow-2xl backdrop-blur-2xl overflow-hidden"
+          style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border)" }}
+        >
+          <div className="flex items-center justify-between p-2 border-b" style={{ borderColor: "var(--border-light)" }}>
+            <span className="text-[10px] font-bold flex items-center gap-1.5" style={{ color: "var(--info)" }}>
+              📅 الإعادات القادمة
+              <span className="rounded-full px-1.5 py-0.5 text-[8px]" style={{ backgroundColor: "rgba(var(--info-rgb), 0.1)", color: "var(--info)" }}>
+                {appointments.length}
+              </span>
+            </span>
+            <button onClick={() => { setShowApptWidget(false); localStorage.setItem("vet_appt_widget", "0"); }}
+              className="rounded-full p-0.5 text-[10px] leading-none hover:scale-110" style={{ color: "var(--text-dim)" }}>
+              ✕
+            </button>
+          </div>
+          <div className="max-h-40 overflow-y-auto p-2 space-y-1.5">
+            {appointments.map((a) => (
+              <div key={a.id} className="flex items-center gap-1.5 rounded-lg border p-1.5 text-[10px]" style={{ borderColor: "var(--border-light)", backgroundColor: "var(--bg-input)" }}>
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold truncate" style={{ color: "var(--text)" }}>{a.name}</span>
+                  <span className="mx-1" style={{ color: "var(--text-muted)" }}>—</span>
+                  <span style={{ color: "var(--text-muted)" }}>{a.animal}</span>
+                  <div className="text-[8px]" style={{ color: "var(--text-dim)" }}>
+                    {a.date}{a.time ? ` ${a.time}` : ""} | <span style={{ color: "var(--info)" }}>{a.reason}</span>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => remindWA(a)} className="rounded-md border px-1.5 py-0.5 text-[9px]" style={{ borderColor: "rgba(var(--accent-rgb), 0.2)", color: "var(--accent)" }}>📱</button>
+                  <button onClick={() => completeAppointment(a)} className="rounded-md border px-1.5 py-0.5 text-[9px]" style={{ borderColor: "rgba(var(--accent-rgb), 0.2)", color: "var(--accent)" }}>✓</button>
+                  <button onClick={() => deleteAppointment(a.id)} className="rounded-md border px-1.5 py-0.5 text-[9px]" style={{ borderColor: "rgba(var(--danger-rgb), 0.2)", color: "var(--danger)" }}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+      {/* Floating badge when widget is hidden but appointments exist */}
+      {!showApptWidget && appointments.length > 0 && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => { setShowApptWidget(true); localStorage.setItem("vet_appt_widget", "1"); }}
+          className="fixed bottom-20 right-4 z-40 flex h-10 w-10 items-center justify-center rounded-full border shadow-xl"
+          style={{ backgroundColor: "var(--bg-card)", borderColor: "rgba(var(--info-rgb), 0.3)" }}
+        >
+          <span className="text-sm">📅</span>
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white"
+            style={{ backgroundColor: "var(--info)" }}>
+            {appointments.length}
+          </span>
+        </motion.button>
       )}
 
       {medicalTimelineClient && (
