@@ -1133,6 +1133,27 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
         </motion.div>
       )}
 
+      {/* Tab: المواعيد */}
+      {activeTab === "appointments" && (
+        <div className="mx-auto max-w-7xl space-y-5">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+            <AppointmentsList appointments={appointments} onRemind={remindWA} onComplete={completeAppointment} onDelete={deleteAppointment} />
+          </motion.div>
+        </div>
+      )}
+
+      {/* Tab: التقارير */}
+      {activeTab === "reports" && (
+        <div className="mx-auto max-w-7xl">
+          <Suspense fallback={<div className="h-48" />}>
+            <RevenueChart visits={visits} />
+          </Suspense>
+          <Suspense fallback={<div className="h-48" />}>
+            <Charts visits={visits} theme={theme} />
+          </Suspense>
+        </div>
+      )}
+
       {medicalTimelineClient && (
         <MedicalTimeline client={medicalTimelineClient} visits={visits} services={services} onClose={() => setMedicalTimelineClient(null)}
           onEdit={(v) => setVisitDetail(v)} onDelete={(id) => deleteVisit(id)} />
