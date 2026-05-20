@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import useScannerInput from "../../../hooks/useScannerInput";
 import { usePharmacy } from "../PharmacyContext";
-import { supabase } from "../../../supabaseClient";
-
 export default function PosDashboard() {
   const { medicines, lookupQR, searchMeds, checkout, pendingRx, prescriptions, prescriptionItems, syncing: ctxSync } = usePharmacy();
   const [cart, setCart] = useState([]);

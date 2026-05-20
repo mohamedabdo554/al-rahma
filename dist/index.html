@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
   <head>
+    <script type="module" crossorigin src="./assets/polyfills-BYkzVuP6.js"></script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>عيادة الرحمة البيطرية</title>
@@ -14,12 +16,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="./assets/index-Up2iM7yY.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DsOOKVs8.css">
+    <script type="module" crossorigin src="./assets/index-B_CyYON4.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/motion-ZXBiGcV7.js">
+    <link rel="modulepreload" crossorigin href="./assets/charts-BNX1NSie.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-7dIF44Uy.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-Cbx-wZIn.css">
+    <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();if(location.protocol!="file:"){window.__vite_is_modern_browser=true}</script>
+    <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
   </head>
   <body>
+    <noscript>
+      <div style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:2rem;text-align:center;font-family:sans-serif;">
+        <div><h2 style="font-size:1.2rem;margin-bottom:0.5rem;">⚠️ عذراً</h2><p style="color:#666;font-size:0.9rem;">يجب تفعيل JavaScript في المتصفح</p></div>
+      </div>
+    </noscript>
     <script>document.documentElement.setAttribute("data-theme",localStorage.getItem("vet_theme")||"light")</script>
     <div id="root"></div>
-    <script>navigator.serviceWorker?.getRegistrations().then(r=>r.forEach(s=>s.unregister()));caches?.keys().then(k=>k.forEach(n=>caches.delete(n)));</script>
+    <script>navigator.serviceWorker&&navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})});window.caches&&caches.keys().then(function(k){k.forEach(function(n){caches.delete(n)})});</script>
+    <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
+    <script nomodule crossorigin id="vite-legacy-polyfill" src="./assets/polyfills-legacy-B9NEPHC8.js"></script>
+    <script nomodule crossorigin id="vite-legacy-entry" data-src="./assets/index-legacy-BomunXOC.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
   </body>
 </html>

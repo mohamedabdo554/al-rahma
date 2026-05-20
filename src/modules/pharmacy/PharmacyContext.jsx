@@ -26,12 +26,13 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
       try {
         setSyncing(true);
         console.log("🔄 Pharmacy pulling...");
-        const [mr, pr, ir, sr, si] = await Promise.allSettled([
+        const [mr, pr, ir, sr, si, pcr] = await Promise.allSettled([
           supabase.from("medicines").select("*"),
           supabase.from("prescriptions").select("*"),
           supabase.from("prescription_items").select("*"),
-          supabase.from("sales").select("*").limit(50),
-          supabase.from("sale_items").select("*").limit(50),
+          supabase.from("sales").select("*").order("id", { ascending: false }).limit(500),
+          supabase.from("sale_items").select("*").limit(500),
+          supabase.from("pharmacy_clients").select("*"),
         ]);
         console.log("📥 Pharmacy pull results:", {
           medicines: mr.status + " " + (mr.value?.data?.length ?? 0),
@@ -39,6 +40,7 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
           prescriptionItems: ir.status + " " + (ir.value?.data?.length ?? 0),
           sales: sr.status + " " + (sr.value?.data?.length ?? 0),
           saleItems: si.status + " " + (si.value?.data?.length ?? 0),
+          pharmacyClients: pcr.status + " " + (pcr.value?.data?.length ?? 0),
         });
         if (mr.status === "fulfilled" && mr.value.data?.length) {
           setMedicines((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = mr.value.data.filter(i => !m.has(i.id)); console.log("➕ merged medicines:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
@@ -54,6 +56,13 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
         }
         if (si.status === "fulfilled" && si.value.data?.length) {
           localStorage.setItem("vet_sale_items", JSON.stringify(si.value.data));
+        }
+        if (pcr.status === "fulfilled" && pcr.value.data?.length) {
+          setPharmacyClients((prev) => {
+            const m = new Map(); prev.forEach(i => m.set(i.id, i));
+            pcr.value.data.forEach(i => { if (!m.has(i.id)) m.set(i.id, i); });
+            return Array.from(m.values());
+          });
         }
       } catch (e) { console.error("Pharmacy pull error:", e); } finally { setSyncing(false); }
     }
@@ -140,12 +149,12 @@ export function PharmacyProvider({ children, localMedicines, localPrescriptions,
 
   function updatePharmacyClient(id, data) {
     setPharmacyClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
-    supabase.from("pharmacy_clients").update(data).eq("id", id).catch(() => {});
+    supabase.from("pharmacy_clients").update(data).eq("id", id).then(() => {}).catch(() => {});
   }
 
   function deletePharmacyClient(id) {
     setPharmacyClients((prev) => prev.filter((c) => c.id !== id));
-    supabase.from("pharmacy_clients").delete().eq("id", id).catch(() => {});
+    supabase.from("pharmacy_clients").delete().eq("id", id).then(() => {}).catch(() => {});
   }
 
   async function checkout({ cart, total, prescriptionId }) {

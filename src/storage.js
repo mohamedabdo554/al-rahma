@@ -80,28 +80,14 @@ const DEFAULT_SERVICES = [
 const DEFAULT_DOCTORS = ["د. عبدالرحمن", "د. محمود"];
 
 const DEFAULTS = {
-  clients: [
-    { id: "1", name: "أحمد", animal: "لولو", type: "قطة", gender: "أنثى", phone: "01001234567", weight: "3.5", debt: 450 },
-    { id: "2", name: "محمد", animal: "ريكس", type: "كلب", gender: "ذكر", phone: "01007654321", weight: "12", debt: 0 },
-    { id: "3", name: "يوسف", animal: "مشمش", type: "قطة", gender: "ذكر", phone: "", weight: "", debt: 180 },
-  ],
-  visits: [
-    { id: 1, name: "أحمد", animal: "لولو", date: "2026-05-15", services: "كشف", total: 80, paid: 0, debt: 80, weight: "3.5", notes: "", doctor: "د. عبدالرحمن", status: "عليه مديونية" },
-    { id: 2, name: "محمد", animal: "ريكس", date: "2026-05-14", services: "متابعه", total: 20, paid: 20, debt: 0, weight: "12", notes: "صحة جيدة", doctor: "د. عبدالرحمن", status: "مدفوع بالكامل ✓" },
-    { id: 3, name: "أحمد", animal: "لولو", date: "2026-04-28", services: "استشاره", total: 30, paid: 0, debt: 30, weight: "3.2", notes: "نحافة", doctor: "د. عبدالرحمن", status: "عليه مديونية" },
-  ],
-  appointments: [
-    { id: 1, name: "أحمد", animal: "لولو", date: "2026-05-18", reason: "جرعة تطعيم ثانية", status: "pending" },
-  ],
+  clients: [],
+  visits: [],
+  appointments: [],
   expenses: [],
 };
 
 const PHARMACY_DEFAULTS = {
-  medicines: [
-    { id: "m1", qr_code: "", name: "أموكسيسيلين 500مجم", quantity: 50, purchase_price: 15, selling_price: 30, expiration_date: "2027-06-01" },
-    { id: "m2", qr_code: "", name: "مضاد هيستامين شراب", quantity: 20, purchase_price: 25, selling_price: 45, expiration_date: "2026-12-01" },
-    { id: "m3", qr_code: "", name: "مطهر جراحي بخاخ", quantity: 10, purchase_price: 40, selling_price: 70, expiration_date: "2027-03-15" },
-  ],
+  medicines: [],
   prescriptions: [],
   prescriptionItems: [],
   sales: [],

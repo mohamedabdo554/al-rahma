@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { loadData, saveData, loadServices, loadDoctors, blobToBase64, loadPharmacyData, loadPharmacyClients } from "./storage";
+import { saveData, loadServices, loadDoctors, blobToBase64, loadPharmacyData, loadPharmacyClients } from "./storage";
 import { supabase } from "./supabaseClient";
 
 import { PharmacyProvider } from "./modules/pharmacy";
@@ -34,18 +34,19 @@ const container = { hidden: {}, visible: { transition: { staggerChildren: 0.06 }
 const normSep = (s) => (s || "").split(/[،,]\s*/).filter(Boolean).join("، ");
 
 function sendNotification(title, body) {
-  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({ type: "SHOW_NOTIFICATION", title, body, tag: "vet-reminder" });
-  } else if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { body, tag: "vet-reminder", vibrate: [200, 100, 200], requireInteraction: true });
-  }
+  try {
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "SHOW_NOTIFICATION", title, body, tag: "vet-reminder" });
+    } else if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, tag: "vet-reminder", vibrate: [200, 100, 200], requireInteraction: true });
+    }
+  } catch (e) {}
 }
 
 export default function App() {
-  const initial = loadData();
-  const [clients, setClients] = useState(initial.clients);
-  const [visits, setVisits] = useState(initial.visits);
-  const [appointments, setAppointments] = useState(initial.appointments);
+  const [clients, setClients] = useState([]);
+  const [visits, setVisits] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [services, setServices] = useState(() => loadServices());
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selected, setSelected] = useState([]);
@@ -55,6 +56,11 @@ export default function App() {
   const [followUpDate, setFollowUpDate] = useState("");
   const [followUpTime, setFollowUpTime] = useState("");
   const [followUpReason, setFollowUpReason] = useState("");
+  const [showQuickFollowUp, setShowQuickFollowUp] = useState(false);
+  const [quickFUClient, setQuickFUClient] = useState(null);
+  const [quickFUDate, setQuickFUDate] = useState("");
+  const [quickFUTime, setQuickFUTime] = useState("");
+  const [quickFUReason, setQuickFUReason] = useState("");
   const [notes, setNotes] = useState("");
   const [savedNotes, setSavedNotes] = useState("");
   const [visitWeight, setVisitWeight] = useState("");
@@ -70,7 +76,7 @@ export default function App() {
 
   const [doctors, setDoctors] = useState(() => loadDoctors());
   const [selectedDoctor, setSelectedDoctor] = useState(doctors[0] || "د. عبدالرحمن");
-  const [expenses, setExpenses] = useState(initial.expenses || []);
+  const [expenses, setExpenses] = useState([]);
   const [financeUnlocked, setFinanceUnlocked] = useState(() => localStorage.getItem("vet_finance_unlocked") === "true");
   const [syncing, setSyncing] = useState(false);
 
@@ -80,6 +86,20 @@ export default function App() {
   const [prescriptions, setPrescriptions] = useState(phInitial.prescriptions);
   const [prescriptionItems, setPrescriptionItems] = useState(phInitial.prescriptionItems);
   const [role, setRole] = useState(() => localStorage.getItem("vet_role") || "doctor");
+
+  // PWA install
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setDeferredPrompt(null));
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+  function handleInstall() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(({ outcome }) => { if (outcome === "accepted") setDeferredPrompt(null); });
+  }
 
   useEffect(() => { saveData({ clients, visits, appointments, expenses }); }, [clients, visits, appointments, expenses]);
 
@@ -126,10 +146,9 @@ export default function App() {
   const remaining = prevDebt + servicesTotal - Number(discount) - Number(paid);
 
   const today = new Date().toISOString().slice(0, 10);
-  const dailyRevenue = visits.filter((v) => v.status === "مدفوع بالكامل ✓").reduce((s, v) => s + v.total, 0);
   const totalDebts = clients.reduce((s, c) => s + c.debt, 0);
   const todayPatients = visits.filter((v) => v.date === today).length;
-  const todayRevenue = visits.filter((v) => v.date === today && v.status === "مدفوع بالكامل ✓").reduce((s, v) => s + v.total, 0);
+  const todayRevenue = visits.filter((v) => v.date === today).reduce((s, v) => s + (v.paid || 0), 0);
 
   const weekFollowUps = useMemo(() => {
     const end = new Date(); end.setDate(end.getDate() + 7);
@@ -142,10 +161,66 @@ export default function App() {
   );
 
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-  const totalRevenue = useMemo(() => visits.filter((v) => v.status === "مدفوع بالكامل ✓").reduce((s, v) => s + v.total, 0), [visits]);
-  const netProfit = totalRevenue - totalExpenses;
+  const totalRevenue = useMemo(() => visits.reduce((s, v) => s + v.total, 0), [visits]);
+  const collectedRevenue = useMemo(() => visits.reduce((s, v) => s + v.total - (v.debt || 0), 0), [visits]);
+  const netProfit = collectedRevenue - totalExpenses;
 
   const show = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); }, []);
+
+  async function CleanOldData({ setClients, setVisits, setAppointments, show }) {
+    console.log("🧹 CleanOldData: fetching all records...");
+    const [clRes, vsRes, apRes] = await Promise.allSettled([
+      supabase.from("clients").select("*"),
+      supabase.from("visits").select("*"),
+      supabase.from("appointments").select("*"),
+    ]);
+    const CUTOFF = "2026-05-19";
+    const toDelete = { clients: [], visits: [], appointments: [] };
+
+    // --- clients: use created_at (auto by Supabase), keep if missing date ---
+    if (clRes.status === "fulfilled" && clRes.value.data?.length) {
+      clRes.value.data.forEach((r) => {
+        const d = r.created_at ? r.created_at.slice(0, 10) : "";
+        if (d && d < CUTOFF) toDelete.clients.push(r.id);
+      });
+      if (toDelete.clients.length) {
+        console.log("🧹 Deleting", toDelete.clients.length, "old clients from Supabase");
+        await supabase.from("clients").delete().in("id", toDelete.clients);
+      }
+    }
+
+    // --- visits: use date field ---
+    if (vsRes.status === "fulfilled" && vsRes.value.data?.length) {
+      vsRes.value.data.forEach((r) => {
+        if (r.date && r.date < CUTOFF) toDelete.visits.push(r.id);
+      });
+      if (toDelete.visits.length) {
+        console.log("🧹 Deleting", toDelete.visits.length, "old visits from Supabase");
+        await supabase.from("visits").delete().in("id", toDelete.visits);
+      }
+    }
+
+    // --- appointments: use date field ---
+    if (apRes.status === "fulfilled" && apRes.value.data?.length) {
+      apRes.value.data.forEach((r) => {
+        if (r.date && r.date < CUTOFF) toDelete.appointments.push(r.id);
+      });
+      if (toDelete.appointments.length) {
+        console.log("🧹 Deleting", toDelete.appointments.length, "old appointments from Supabase");
+        await supabase.from("appointments").delete().in("id", toDelete.appointments);
+      }
+    }
+
+    // --- update local state to show only real data ---
+    const oldIds = toDelete;
+    setClients((prev) => prev.filter((c) => !oldIds.clients.includes(c.id)));
+    setVisits((prev) => prev.filter((v) => !oldIds.visits.includes(v.id)));
+    setAppointments((prev) => prev.filter((a) => !oldIds.appointments.includes(a.id)));
+
+    const total = toDelete.clients.length + toDelete.visits.length + toDelete.appointments.length;
+    if (total) show(`🧹 تم تطهير ${total} سجل تجريبي قديم`);
+    console.log("🧹 CleanOldData done, deleted", total, "old records");
+  }
 
   // Sync from Supabase on mount — merge with local data (local wins for same id, remote fills gaps)
   useEffect(() => {
@@ -156,8 +231,8 @@ export default function App() {
         console.log("🔄 Pulling from Supabase...");
         const [cl, vs, ap, sv] = await Promise.allSettled([
           supabase.from("clients").select("*"),
-          supabase.from("visits").select("*").limit(50),
-          supabase.from("appointments").select("*").limit(30),
+          supabase.from("visits").select("*").order("id", { ascending: false }).limit(1000),
+          supabase.from("appointments").select("*").order("id", { ascending: false }),
           supabase.from("services").select("*"),
         ]);
         if (cancelled) return;
@@ -168,68 +243,59 @@ export default function App() {
           services: sv.status + " (" + (sv.value?.data?.length ?? 0) + " rows)" + (sv.reason ? " ERROR:" + sv.reason?.message : ""),
         }, null, 2));
         if (cl.status === "fulfilled" && cl.value.data?.length) {
-          setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = cl.value.data.filter(i => !m.has(i.id)); console.log("➕ merged clients:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
+          setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); cl.value.data.filter(i => i.name).forEach(i => { const existing = m.get(i.id); if (!existing) { m.set(i.id, i); } else if (existing.debt > 0 && !i.debt) { m.set(i.id, { ...existing, debt: 0 }); } }); return Array.from(m.values()); });
         }
         if (vs.status === "fulfilled" && vs.value.data?.length) {
-          setVisits((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = vs.value.data.filter(i => !m.has(i.id)); console.log("➕ merged visits:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
+          setVisits((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); vs.value.data.filter(v => v.name).map(v => ({ ...v, status: v.status || (v.debt > 0 ? "عليه مديونية" : "مدفوع بالكامل ✓") })).forEach(v => { const existing = m.get(v.id); if (!existing) { m.set(v.id, v); } else if (!existing.name && v.name) { m.set(v.id, { ...existing, name: v.name, animal: v.animal }); } }); return Array.from(m.values()); });
         }
         if (ap.status === "fulfilled" && ap.value.data?.length) {
-          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = ap.value.data.filter(i => !m.has(i.id)); console.log("➕ merged appointments:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
+          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap.value.data.map(a => ({ ...a, status: a.status || "pending" })).forEach(i => { const existing = m.get(i.id); if (!existing) console.log("➕ merged appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
         }
         if (sv.status === "fulfilled" && sv.value.data?.length) {
           setServices((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = sv.value.data.filter(i => !m.has(i.id)); console.log("➕ merged services:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
         }
+        // Always dedup duplicates (same date + total + services = same visit, keep one with name/animal, else earliest)
+        setVisits((prev) => {
+          const seen = new Map();
+          prev.forEach((v) => {
+            const key = v.date + "|" + v.total + "|" + (v.services || "");
+            const existing = seen.get(key);
+            if (!existing) { seen.set(key, v); return; }
+            const prefer = v.name && v.animal ? v : existing.name && existing.animal ? existing : v.id < existing.id ? v : existing;
+            seen.set(key, prefer);
+          });
+          if (seen.size < prev.length) {
+            const seenKeys = new Set(seen.keys());
+            const dupes = prev.filter((v) => !seenKeys.has(v.date + "|" + v.total + "|" + (v.services || ""))).map((v) => v.id);
+            console.log("🧹 Deduped", dupes.length, "visits, deleting from Supabase:", dupes);
+            supabase.from("visits").delete().in("id", dupes).then(({ error }) => { if (error) console.error("dedup delete error:", error); }).catch(() => {});
+          }
+          return Array.from(seen.values());
+        });
       } catch (e) { console.error("❌ Pull error:", e); } finally {
         if (!cancelled) setSyncing(false);
       }
     }
     pull();
-    return () => { cancelled = true; };
+    // Periodic re-pull (appointments + clients for debt sync) every 20s
+    const interval = setInterval(async () => {
+      try {
+        const [cl2, ap2] = await Promise.allSettled([
+          supabase.from("clients").select("id,debt"),
+          supabase.from("appointments").select("*").order("id", { ascending: false }),
+        ]);
+        if (cl2.status === "fulfilled" && cl2.value.data?.length) {
+          setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); cl2.value.data.forEach(i => { const existing = m.get(i.id); if (existing && existing.debt > 0 && !i.debt) m.set(i.id, { ...existing, debt: 0 }); }); return Array.from(m.values()); });
+        }
+        if (ap2.status === "fulfilled" && ap2.value.data?.length) {
+          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap2.value.data.map(a => ({ ...a, status: a.status || "pending" })).forEach(i => { const existing = m.get(i.id); if (!existing) console.log("📅 auto-synced new appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
+        }
+      } catch (e) {}
+    }, 20000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // Debounced push to Supabase when data changes (3s after last change)
-  const pushTimer = useRef(null);
-  useEffect(() => {
-    if (pushTimer.current) clearTimeout(pushTimer.current);
-    pushTimer.current = setTimeout(async () => {
-      // Only send exact columns that exist in Supabase tables — no extra fields
-      const clientsForDB = clients.map(c => ({
-        id: c.id, name: c.name, animal: c.animal, type: c.type || "",
-        gender: c.gender || "", phone: c.phone || "",
-        weight: c.weight || "", debt: c.debt ?? 0,
-      }));
-      const visitsForDB = visits.map(({ audio, ...rest }) => ({
-        id: rest.id,
-        date: rest.date, services: rest.services || "",
-        total: Number(rest.total) || 0, paid: Number(rest.paid) || 0, debt: Number(rest.debt) || 0,
-        weight: rest.weight || "", notes: rest.notes || "",
-      }));
-      try {
-        setSyncing(true);
-        // Test connection with a simple GET
-        const test = await supabase.from("clients").select("id", { count: "exact", head: true });
-        if (test.error) {
-          console.error("❌ Supabase connection FAILED:", test.error);
-          return;
-        }
-        console.log("✅ Supabase connected — pushing data...");
-        // Push each table individually and log errors
-        const r1 = await supabase.from("clients").upsert(clientsForDB);
-        if (r1.error) console.error("❌ clients push error:", JSON.stringify(r1.error)); else console.log("✅ clients pushed");
-        const r2 = await supabase.from("visits").upsert(visitsForDB);
-        if (r2.error) console.error("❌ visits push error:", JSON.stringify(r2.error)); else console.log("✅ visits pushed");
-        // Push services
-        const servicesForDB = services.map(s => ({ id: s.id, name: s.name, price: s.price ?? 0, daily: s.daily ?? false }));
-        const r4 = await supabase.from("services").upsert(servicesForDB);
-        if (r4.error) console.error("❌ services push error:", JSON.stringify(r4.error)); else console.log("✅ services pushed");
-      } catch (e) {
-        console.error("❌ Supabase sync crashed:", e?.message || e);
-      } finally {
-        setSyncing(false);
-      }
-  }, 3000);
-  return () => { if (pushTimer.current) clearTimeout(pushTimer.current); };
-}, [clients, visits, services]);
+  // No automatic push timer — data is pushed ONLY on manual actions (save, settle, etc.) with await
 
   function addClient({ name, animal, type, phone, weight }) {
     const c = { id: Date.now().toString(), name, animal, type, phone, weight, debt: 0 };
@@ -251,7 +317,53 @@ export default function App() {
   function deleteClient(id) {
     setClients((p) => p.filter((c) => c.id !== id));
     if (selectedClientId === id) setSelectedClientId("");
+    supabase.from("clients").delete().eq("id", id).then(() => {}).catch(() => {});
     show("🗑️ تم حذف العميل");
+  }
+
+  function bulkDeleteClients(ids) {
+    setClients((p) => p.filter((c) => !ids.includes(c.id)));
+    if (ids.includes(selectedClientId)) setSelectedClientId("");
+    Promise.allSettled(ids.map((id) => supabase.from("clients").delete().eq("id", id).then(() => {}))).catch(() => {});
+    show(`🗑️ تم حذف ${ids.length} عملاء`);
+  }
+
+  function deleteVisit(id) {
+    setVisits((p) => p.filter((v) => v.id !== id));
+    supabase.from("visits").delete().eq("id", id).then(() => {}).catch(() => {});
+    show("🗑️ تم حذف الزيارة");
+  }
+
+  async function settleDebt(id) {
+    const c = clients.find(x => x.id === id);
+    if (!c) return;
+    setClients((p) => p.map((x) => (x.id === id ? { ...x, debt: 0 } : x)));
+    setVisits((p) => p.map((v) =>
+      v.debt > 0 && v.name === c.name && v.animal === c.animal
+        ? { ...v, debt: 0, paid: v.total, status: "مدفوع بالكامل ✓" }
+        : v
+    ));
+    await supabase.from("clients").update({ debt: 0 }).eq("id", id);
+    const { data: dv } = await supabase.from("visits").select("id, total").eq("name", c.name).eq("animal", c.animal).gt("debt", 0);
+    if (dv?.length) {
+      for (const v of dv) {
+        await supabase.from("visits").update({ debt: 0, paid: v.total, status: "مدفوع بالكامل ✓" }).eq("id", v.id);
+      }
+    }
+    show("✅ تم تسديد المديونية");
+  }
+
+  async function addFollowUpOnly(name, animal) {
+    if (!quickFUDate) { show("⚠️ اختر تاريخ المتابعة"); return; }
+    const appId = Date.now();
+    const c = clients.find((x) => x.name === name && x.animal === animal);
+    const newApp = { id: appId, clientId: c?.id || "", name, animal, date: quickFUDate, time: quickFUTime || "", reason: quickFUReason || "متابعة", status: "pending" };
+    setAppointments((p) => [newApp, ...p]);
+    const { error } = await supabase.from("appointments").insert([newApp]);
+    if (error) console.error("❌ follow-up insert error:", error);
+    setShowQuickFollowUp(false);
+    setQuickFUDate(""); setQuickFUTime(""); setQuickFUReason("");
+    show("✅ تم إضافة موعد المتابعة");
   }
 
   function addServiceToInvoice(item) { setSelected((p) => [...p, item]); }
@@ -301,12 +413,11 @@ export default function App() {
   // Send appointment reminder via WhatsApp
   function remindWA(app) {
     const c = clients.find((cl) => cl.name === app.name && cl.animal === app.animal);
+    if (!c) { show("⚠️ العميل غير موجود في هذا الجهاز"); return; }
     const num = waNumber(c?.phone);
+    if (!num) { show("⚠️ العميل ليس لديه رقم هاتف"); return; }
     const t = `مرحباً أستاذ ${app.name}، نذكركم بموعد إعادة الكشف لـ ${app.animal} غداً في عيادة الرحمة لمتابعة: ${app.reason}. تشرفنا زيارتكم 📅`;
-    const url = num
-      ? `https://wa.me/${num}?text=${encodeURIComponent(t)}`
-      : `https://wa.me/?text=${encodeURIComponent(t)}`;
-    window.open(url, "_blank");
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(t)}`, "_blank");
   }
 
   // Save visit
@@ -334,8 +445,10 @@ export default function App() {
       setClients((p) => p.map((c) => (c.id === selectedClientId ? { ...c, debt, weight } : c)));
       if (followUpDate) {
         const appId = Date.now();
-        setAppointments((p) => [{ id: appId, name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة" }, ...p]);
-        supabase.from("appointments").insert({ id: appId, name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة" }).then(({ error }) => { if (error) console.error("appointment insert error:", error); }).catch(() => {});
+        const newApp = { id: appId, clientId: client.id, name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة", status: "pending" };
+        setAppointments((p) => [newApp, ...p]);
+        const { error } = await supabase.from("appointments").insert([newApp]);
+        if (error) console.error("❌ appointment insert error:", error);
       }
       setSelected([]); setDiscount(0); setPaid(0); setNotes("");
       setVisitWeight(""); setAudioBlob(null);
@@ -596,27 +709,32 @@ export default function App() {
         activeTab={activeTab} onTabChange={setActiveTab}
         weekFollowUps={activeTab === "pharmacy" ? 0 : weekFollowUps}
         role={role} onRoleChange={handleRoleChange}
-        onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
-          const end = new Date(); end.setDate(end.getDate() + 7);
-          const followUps = appointments.filter((a) => a.date >= today && a.date <= end.toISOString().slice(0, 10) && a.status !== "completed");
-          const sent = new Set();
-          followUps.forEach((a) => {
-            const c = clients.find((cl) => cl.name === a.name && cl.animal === a.animal);
-            if (c?.phone && !sent.has(c.id)) {
-              sent.add(c.id);
-              setTimeout(() => {
-                const num = c.phone.replace(/^0+/, "20").replace(/[^\d]/g, "");
-                window.open(`https://wa.me/${num}?text=${encodeURIComponent(`عيادة الرحمة البيطرية 🐾\nتذكير بموعد إعادة الكشف للحيوان ${c.animal}.\nننتظركم في الموعد المحدد.`)}`, "_blank");
-              }, sent.size * 800);
-            }
-          });
-        } : null}
+        deferredPrompt={deferredPrompt} onInstall={handleInstall}
+onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
+  const end = new Date(); end.setDate(end.getDate() + 7);
+  const followUps = appointments.filter((a) => a.date >= today && a.date <= end.toISOString().slice(0, 10) && a.status !== "completed");
+  const sent = new Set();
+  let count = 0;
+  followUps.forEach((a) => {
+    const c = clients.find((cl) => cl.name === a.name && cl.animal === a.animal);
+    if (c?.phone && !sent.has(c.id)) {
+      sent.add(c.id);
+      count++;
+      setTimeout(() => {
+        const num = c.phone.replace(/^0+/, "20").replace(/[^\d]/g, "");
+        window.open(`https://wa.me/${num}?text=${encodeURIComponent(`عيادة الرحمة 🐾\nتذكير بموعد إعادة الكشف للحيوان ${c.animal}.\nننتظركم في الموعد المحدد.`)}`, "_blank");
+      }, sent.size * 800);
+    }
+  });
+  if (count === 0) show("⚠️ لا يوجد عملاء لديهم أرقام هواتف للمتابعة");
+  else show(`✅ تم إرسال ${count} رسالة`);
+} : null}
  />
 
       {activeTab !== "pharmacy" && (
         <AppointmentMarquee appointments={appointments} onSelect={(a) => {
           const c = clients.find((cl) => cl.name === a.name && cl.animal === a.animal);
-          if (c) { setSelectedClientId(c.id); setActiveTab("clinic"); }
+          if (c) { setSelectedClientId(c.id); setActiveTab("clinic"); } else { show("⚠️ العميل غير موجود في الجهاز — اسحب البيانات أولاً"); }
         }} />
       )}
 
@@ -633,7 +751,7 @@ export default function App() {
       </div>
 
       {activeTab !== "pharmacy" && (
-        <SearchBar clients={clients} onSelect={(id) => { setSelectedClientId(id); setActiveTab("clinic"); }} />
+        <SearchBar clients={clients} onSelect={(id) => { setSelectedClientId(id); if (activeTab !== "timeline") setActiveTab("clinic"); }} />
       )}
 
       {/* Tab: الكشف */}
@@ -651,7 +769,7 @@ export default function App() {
 
             <ClientSelector clients={clients} selectedClientId={selectedClientId}
               onSelect={setSelectedClientId} onAdd={addClient}
-              onUpdate={updateClient} onDelete={deleteClient} />
+              onUpdate={updateClient} onDelete={deleteClient} onBulkDelete={bulkDeleteClients} />
 
             <ServicesPanel services={services} selected={selected} visits={visits}
               onAddService={addServiceToInvoice} onRemoveService={removeService}
@@ -660,6 +778,14 @@ export default function App() {
 
             <VisitHistory client={client} visits={visits} onVisitClick={setVisitDetail}
               onTimeline={client ? () => setMedicalTimelineClient(client) : null} />
+            {client && (
+              <motion.button whileTap={{ scale: 0.95 }}
+                onClick={() => { setQuickFUClient(client); setQuickFUDate(""); setQuickFUTime(""); setQuickFUReason(""); setShowQuickFollowUp(true); }}
+                className="w-full rounded-xl border py-2.5 text-[10px] font-semibold transition-all hover:shadow-sm"
+                style={{ borderColor: "var(--border)", color: "var(--info)", backgroundColor: "var(--bg-card)" }}>
+                📅 إضافة متابعة للعميل
+              </motion.button>
+            )}
           </motion.div>
 
           {client && selected.length > 0 && (
@@ -693,35 +819,100 @@ export default function App() {
 
       {/* Tab: السجل الطبي */}
       {activeTab === "timeline" && (
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-7xl space-y-5">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+            <div className="rounded-2xl border p-4" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-card)" }}>
+              <h2 className="text-xs font-bold mb-3" style={{ color: "var(--info)" }}>📋 السجل الطبي</h2>
+              <select aria-label="اختر العميل"
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+                className="w-full rounded-xl border p-2.5 text-xs outline-none"
+                style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }}>
+                <option value="">— اختر عميل —</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} — {c.animal} ({c.type}){c.debt > 0 ? ` | +${c.debt} ج.م` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {!client ? (
               <div className="flex flex-col items-center py-16 rounded-2xl border backdrop-blur-sm" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-card)" }}>
                 <span className="text-3xl mb-3 opacity-40">📋</span>
-                <p className="text-xs" style={{ color: "var(--text-dim)" }}>اختر عميلاً من البحث أعلاه لعرض سجله الطبي</p>
+                <p className="text-xs" style={{ color: "var(--text-dim)" }}>اختر عميلاً من القائمة أعلاه لعرض سجله الطبي</p>
               </div>
             ) : (
-              <div className="flex flex-col items-center py-12 rounded-2xl border backdrop-blur-sm" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-card)" }}>
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-lg">{client.animal}</span>
-                  <div>
-                    <h3 className="text-sm font-bold" style={{ color: "var(--text)" }}>{client.name}</h3>
-                    <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                      {client.type} · {client.gender === "ذكر" ? "♂ ذكر" : "♀ أنثى"}
-                      {client.weight && ` · ${client.weight} كجم`}
-                      {client.phone && ` · ${client.phone}`}
-                    </p>
+              <div className="space-y-5">
+                <div className="flex flex-col items-center py-8 rounded-2xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-card)" }}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-lg">{client.animal}</span>
+                    <div>
+                      <h3 className="text-sm font-bold" style={{ color: "var(--text)" }}>{client.name}</h3>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                        {client.type} · {client.gender === "ذكر" ? "♂ ذكر" : "♀ أنثى"}
+                        {client.weight && ` · ${client.weight} كجم`}
+                        {client.phone && ` · ${client.phone}`}
+                      </p>
+                    </div>
                   </div>
+                  <motion.button whileTap={{ scale: 0.95 }}
+                    onClick={() => setMedicalTimelineClient(client)}
+                    className="rounded-xl px-6 py-3 text-sm font-bold text-white transition-all hover:shadow-xl"
+                    style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-dark))" }}>
+                    📋 عرض السجل الطبي الكامل
+                  </motion.button>
+                  <motion.button whileTap={{ scale: 0.95 }}
+                    onClick={() => { setQuickFUClient(client); setQuickFUDate(""); setQuickFUTime(""); setQuickFUReason(""); setShowQuickFollowUp(true); }}
+                    className="rounded-xl border px-6 py-3 text-sm font-semibold transition-all hover:shadow-sm"
+                    style={{ borderColor: "var(--info)", color: "var(--info)", backgroundColor: "rgba(var(--info-rgb), 0.06)" }}>
+                    📅 إضافة متابعة
+                  </motion.button>
+                  <p className="mt-3 text-[10px]" style={{ color: "var(--text-dim)" }}>
+                    {visits.filter((v) => v.name === client.name && v.animal === client.animal).length} زيارة سابقة
+                  </p>
                 </div>
-                <motion.button whileTap={{ scale: 0.95 }}
-                  onClick={() => setMedicalTimelineClient(client)}
-                  className="rounded-xl px-6 py-3 text-sm font-bold text-white transition-all hover:shadow-xl"
-                  style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-dark))" }}>
-                  📋 عرض السجل الطبي الكامل
-                </motion.button>
-                <p className="mt-3 text-[10px]" style={{ color: "var(--text-dim)" }}>
-                  {visits.filter((v) => v.name === client.name && v.animal === client.animal).length} زيارة سابقة
-                </p>
+
+                {/* Inline visits */}
+                {(() => {
+                  const pv = visits.filter((v) => v.name === client.name && v.animal === client.animal).sort((a, b) => b.id - a.id);
+                  return pv.length > 0 && (
+                    <div className="rounded-2xl border p-4" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-card)" }}>
+                      <h3 className="text-[10px] font-bold mb-3" style={{ color: "var(--text-muted)" }}>🕐 جميع الزيارات والخدمات</h3>
+                      <div className="space-y-2">
+                        {pv.map((v) => {
+                          const svcList = v.services ? v.services.split("، ").filter(Boolean) : [];
+                          return (
+                            <div key={v.id} className="rounded-xl border p-3 text-[10px]" style={{ borderColor: "var(--border-light)", backgroundColor: "var(--bg-input)" }}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold" style={{ color: "var(--text)" }}>{v.date}</span>
+                                <span style={{ color: v.debt > 0 ? "var(--danger)" : "var(--accent)" }}>
+                                  {v.total} ج.م {v.debt > 0 ? `(متبقي ${v.debt})` : "✓"}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1 mb-1">
+                                {svcList.map((s, i) => (
+                                  <span key={i} className="rounded-md px-1.5 py-0.5 text-[8px]" style={{ backgroundColor: "rgba(var(--accent-rgb), 0.08)", color: "var(--accent)" }}>{s}</span>
+                                ))}
+                              </div>
+                              <div className="flex flex-wrap gap-2 text-[8px]" style={{ color: "var(--text-dim)" }}>
+                                {v.doctor && <span>👨‍⚕️ {v.doctor}</span>}
+                                {v.weight && <span>⚖️ {v.weight} كجم</span>}
+                                {v.notes && <span>📝 {v.notes}</span>}
+                              </div>
+                              <motion.button whileTap={{ scale: 0.9 }}
+                                onClick={() => setVisitDetail(v)}
+                                className="mt-1.5 rounded-lg border px-2 py-0.5 text-[8px]"
+                                style={{ borderColor: "var(--border)", color: "var(--info)" }}>
+                                🔍 تفاصيل
+                              </motion.button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </motion.div>
@@ -760,10 +951,14 @@ export default function App() {
               <Suspense fallback={<div className="h-32" />}><RevenueChart visits={visits} /></Suspense>
 
               {/* Profit Summary */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <div className="card-premium p-4">
-                  <div className="text-[9px] font-medium mb-1" style={{ color: "var(--text-dim)" }}>💰 الإيرادات</div>
+                  <div className="text-[9px] font-medium mb-1" style={{ color: "var(--text-dim)" }}>💰 إجمالي الفواتير</div>
                   <div className="text-lg font-black" style={{ color: "var(--accent)" }}>{totalRevenue} ج.م</div>
+                </div>
+                <div className="card-premium p-4">
+                  <div className="text-[9px] font-medium mb-1" style={{ color: "var(--text-dim)" }}>✅ المحصل</div>
+                  <div className="text-lg font-black" style={{ color: "var(--accent)" }}>{collectedRevenue} ج.م</div>
                 </div>
                 <div className="card-premium p-4">
                   <div className="text-[9px] font-medium mb-1" style={{ color: "var(--text-dim)" }}>📉 المصاريف</div>
@@ -839,31 +1034,176 @@ export default function App() {
               {/* Charts */}
               <Suspense fallback={<div className="h-48" />}><Charts visits={visits} theme={theme} /></Suspense>
 
-              {/* Debtor summary cards */}
+              {/* Debtor list with actions */}
               {(() => {
-                const debtors = clients.filter((c) => c.debt > 0);
-                const totalDebt = debtors.reduce((s, c) => s + c.debt, 0);
-                const avgDebt = debtors.length > 0 ? Math.round(totalDebt / debtors.length) : 0;
+                const debtors = clients.filter((c) => c.debt > 0).sort((a, b) => b.debt - a.debt);
                 return (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "rgba(var(--danger-rgb), 0.2)", backgroundColor: "rgba(var(--danger-rgb), 0.04)" }}>
-                      <div className="text-lg font-black" style={{ color: "var(--danger)" }}>{debtors.length}</div>
-                      <div className="text-[9px] mt-0.5" style={{ color: "var(--text-dim)" }}>عدد المدينين</div>
+                  <div className="card-premium p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: "var(--danger)" }}>
+                        🏦 قائمة المدينين ({debtors.length})
+                      </h3>
+                      <span className="text-[10px] font-bold" style={{ color: "var(--danger)" }}>
+                        {debtors.reduce((s, c) => s + c.debt, 0)} ج.م
+                      </span>
                     </div>
-                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "rgba(var(--warning-rgb), 0.2)", backgroundColor: "rgba(var(--warning-rgb), 0.04)" }}>
-                      <div className="text-lg font-black" style={{ color: "var(--warning)" }}>{totalDebt} ج.م</div>
-                      <div className="text-[9px] mt-0.5" style={{ color: "var(--text-dim)" }}>إجمالي الديون</div>
-                    </div>
-                    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "rgba(var(--accent-rgb), 0.2)", backgroundColor: "rgba(var(--accent-rgb), 0.04)" }}>
-                      <div className="text-lg font-black" style={{ color: "var(--accent)" }}>{avgDebt} ج.م</div>
-                      <div className="text-[9px] mt-0.5" style={{ color: "var(--text-dim)" }}>متوسط الدين</div>
-                    </div>
+                    {debtors.length === 0 ? (
+                      <div className="py-6 text-center text-[11px]" style={{ color: "var(--text-dim)" }}>
+                        🎉 لا يوجد مدينين
+                      </div>
+                    ) : (
+                      <div className="max-h-72 space-y-1.5 overflow-y-auto">
+                        {debtors.map((c) => (
+                          <div key={c.id}
+                            className="flex items-center gap-2 rounded-xl border p-2.5 text-[10px]"
+                            style={{ borderColor: "rgba(var(--danger-rgb), 0.12)", backgroundColor: "rgba(var(--danger-rgb), 0.03)" }}>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold truncate" style={{ color: "var(--text)" }}>{c.name}</span>
+                                <span className="shrink-0" style={{ color: "var(--text-dim)" }}>— {c.animal}</span>
+                              </div>
+                              {c.phone && <div className="text-[8px] mt-0.5" style={{ color: "var(--text-dim)" }}>📞 {c.phone}</div>}
+                            </div>
+                            <span className="font-bold shrink-0" style={{ color: "var(--danger)" }}>{c.debt} ج.م</span>
+                            <motion.button whileTap={{ scale: 0.85 }}
+                              onClick={() => sendDebtWA(c)}
+                              className="rounded-lg border px-2 py-1 text-[9px] shrink-0"
+                              style={{ borderColor: "rgba(var(--accent-rgb), 0.25)", color: "var(--accent)" }}>
+                              📱 واتساب
+                            </motion.button>
+                            <motion.button whileTap={{ scale: 0.85 }}
+                              onClick={() => settleDebt(c.id)}
+                              className="rounded-lg border px-2 py-1 text-[9px] font-bold shrink-0"
+                              style={{ borderColor: "rgba(var(--accent-rgb), 0.25)", color: "var(--accent)", backgroundColor: "rgba(var(--accent-rgb), 0.06)" }}>
+                              ✅ تسديد
+                            </motion.button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Recent visits / invoices */}
+              {(() => {
+                const recent = [...visits].sort((a, b) => b.id - a.id).slice(0, 30);
+                return (
+                  <div className="card-premium p-4">
+                    <h3 className="text-[11px] font-bold flex items-center gap-1.5 mb-3" style={{ color: "var(--accent)" }}>
+                      🧾 آخر الفواتير والزيارات
+                    </h3>
+                    {recent.length === 0 ? (
+                      <div className="py-6 text-center text-[11px]" style={{ color: "var(--text-dim)" }}>
+                        لا توجد زيارات مسجلة
+                      </div>
+                    ) : (
+                      <div className="max-h-72 space-y-1 overflow-y-auto">
+                        {recent.map((v) => (
+                          <div key={v.id}
+                            className="flex items-center justify-between rounded-lg border p-2 text-[10px]"
+                            style={{ borderColor: "var(--border-light)", backgroundColor: "var(--bg-input)" }}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium truncate" style={{ color: "var(--text)" }}>{v.name || "—"}</span>
+                              <span className="text-[8px] shrink-0" style={{ color: "var(--text-dim)" }}>{v.date}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-bold" style={{ color: v.debt > 0 ? "var(--danger)" : "var(--accent)" }}>
+                                {v.total} ج.م
+                              </span>
+                              {v.debt > 0 && <span className="text-[8px]" style={{ color: "var(--danger)" }}>ديون {v.debt}</span>}
+                              {v.debt <= 0 && <span style={{ color: "var(--accent)" }}>✓</span>}
+                              <motion.button whileTap={{ scale: 0.85 }}
+                                onClick={() => setVisitDetail(v)}
+                                className="rounded-lg border px-1.5 py-0.5 text-[8px]"
+                                style={{ borderColor: "var(--border)", color: "var(--info)" }}>
+                                🔍
+                              </motion.button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
             </>
           )}
         </motion.div>
+      )}
+
+      {medicalTimelineClient && (
+        <MedicalTimeline client={medicalTimelineClient} visits={visits} services={services} onClose={() => setMedicalTimelineClient(null)}
+          onEdit={(v) => setVisitDetail(v)} onDelete={(id) => deleteVisit(id)} />
+      )}
+      {showInvoice && client && (
+        <Suspense fallback={null}>
+          <InvoiceModal client={client} selected={selected} servicesTotal={servicesTotal}
+            discount={discount} paid={paid} remaining={remaining} notes={notes}
+            method={method} patientHistory={patientHistory} today={today} theme={theme}
+            onClose={() => setShowInvoice(false)} doctor={selectedDoctor} />
+        </Suspense>
+      )}
+      {visitDetail && (
+        <Suspense fallback={null}>
+          <VisitDetailModal visit={visitDetail} client={client}
+            onClose={() => setVisitDetail(null)}
+            onMedicalReport={() => { setReportVisit(visitDetail); setVisitDetail(null); }} />
+        </Suspense>
+      )}
+      {reportVisit && (
+        <Suspense fallback={null}>
+          <MedicalReport visit={reportVisit} client={client} onClose={() => setReportVisit(null)} />
+        </Suspense>
+      )}
+
+      {/* Quick follow-up modal */}
+      {showQuickFollowUp && quickFUClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onClick={() => setShowQuickFollowUp(false)}>
+          <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
+            className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden"
+            style={{ backgroundColor: "var(--bg-card-solid)", borderColor: "var(--border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b" style={{ borderColor: "var(--border-light)" }}>
+              <h3 className="text-sm font-bold" style={{ color: "var(--text)" }}>📅 إضافة موعد متابعة</h3>
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{quickFUClient.name} — {quickFUClient.animal}</p>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold mb-1" style={{ color: "var(--text-muted)" }}>التاريخ</label>
+                <input type="date" value={quickFUDate} onChange={(e) => setQuickFUDate(e.target.value)}
+                  className="w-full rounded-xl border p-2.5 text-xs outline-none"
+                  style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold mb-1" style={{ color: "var(--text-muted)" }}>الوقت (اختياري)</label>
+                <input type="time" value={quickFUTime} onChange={(e) => setQuickFUTime(e.target.value)}
+                  className="w-full rounded-xl border p-2.5 text-xs outline-none"
+                  style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold mb-1" style={{ color: "var(--text-muted)" }}>السبب</label>
+                <input placeholder="متابعة" value={quickFUReason} onChange={(e) => setQuickFUReason(e.target.value)}
+                  className="w-full rounded-xl border p-2.5 text-xs outline-none"
+                  style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+              </div>
+            </div>
+            <div className="p-3 flex gap-2 border-t" style={{ borderColor: "var(--border-light)", backgroundColor: "var(--bg-input)" }}>
+              <motion.button whileTap={{ scale: 0.95 }}
+                onClick={() => addFollowUpOnly(quickFUClient.name, quickFUClient.animal)}
+                className="flex-1 rounded-xl py-2.5 text-xs font-bold text-white transition-all hover:shadow-lg"
+                style={{ background: "linear-gradient(135deg, var(--info), var(--info-dark))" }}>
+                ✅ تأكيد المتابعة
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.95 }}
+                onClick={() => setShowQuickFollowUp(false)}
+                className="rounded-xl border px-6 py-2.5 text-xs font-semibold"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                إلغاء
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </main>
   );

@@ -3,15 +3,16 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 
 export default function RevenueChart({ visits }) {
   const data = useMemo(() => {
+    const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+      const key = fmt(d);
       const label = d.toLocaleDateString("ar-EG", { weekday: "short" });
       const total = visits
-        .filter((v) => v.date === key && v.status === "مدفوع بالكامل ✓")
-        .reduce((s, v) => s + v.total, 0);
+        .filter((v) => v.date === key)
+        .reduce((s, v) => s + (v.paid || 0), 0);
       days.push({ date: label, revenue: total });
     }
     return days;

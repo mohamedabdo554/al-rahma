@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 
-export default function Header({ theme, toggleTheme, todayPatients, totalDebts, totalClients, activeTab, onTabChange, weekFollowUps, role, onRoleChange, onSendFollowUpWA }) {
+export default function Header({ theme, toggleTheme, todayPatients, totalDebts, totalClients, activeTab, onTabChange, weekFollowUps, role, onRoleChange, onSendFollowUpWA, deferredPrompt, onInstall }) {
   const isPharmacy = role === "pharmacist";
   const tabs = isPharmacy
     ? [{ key: "pharmacy", label: "الصيدلية", icon: "💊" }]
@@ -50,6 +50,21 @@ export default function Header({ theme, toggleTheme, todayPatients, totalDebts, 
         </div>
 
         <div className="flex items-center gap-2">
+          {deferredPrompt && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileTap={{ scale: 0.93 }}
+              onClick={onInstall}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-bold text-white shadow-lg transition-all whitespace-nowrap"
+              style={{
+                background: "linear-gradient(135deg, #065f46, #059669)",
+                boxShadow: "0 3px 16px rgba(5,150,105,0.3)",
+              }}>
+              <span>📲</span>
+              <span>تثبيت</span>
+            </motion.button>
+          )}
           <motion.button whileTap={{ scale: 0.85 }}
             onClick={() => onRoleChange(role === "doctor" ? "pharmacist" : "doctor")}
             className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[9px] font-bold transition-all"

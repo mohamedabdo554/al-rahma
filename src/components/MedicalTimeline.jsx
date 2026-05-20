@@ -1,13 +1,22 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 
-export default function MedicalTimeline({ client, visits: allVisits, onClose }) {
+export default function MedicalTimeline({ client, visits: allVisits, services = [], onClose, onEdit, onDelete }) {
   const visits = useMemo(() => {
     if (!client) return [];
     return allVisits
-      .filter((v) => v.name === client.name && v.animal === client.animal)
+      .filter((v) => {
+        if (!v.name && !v.animal) return false;
+        return v.name === client.name && (!v.animal || v.animal === client.animal);
+      })
       .sort((a, b) => b.id - a.id);
   }, [client, allVisits]);
+
+  const servicePrices = useMemo(() => {
+    const m = {};
+    services.forEach((s) => { m[s.name] = s.price; });
+    return m;
+  }, [services]);
 
   if (!client) return null;
 
@@ -31,7 +40,9 @@ export default function MedicalTimeline({ client, visits: allVisits, onClose }) 
               {client.weight && ` ⚖️ ${client.weight} كجم`}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg border px-3 py-1.5 text-[10px]" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>✕ إغلاق</button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="rounded-lg border px-3 py-1.5 text-[10px]" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>✕ إغلاق</button>
+          </div>
         </div>
 
         {/* Timeline */}
@@ -72,15 +83,33 @@ export default function MedicalTimeline({ client, visits: allVisits, onClose }) 
                         <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: "var(--bg-input)", color: "var(--text-muted)" }}>
                           {v.total} ج.م
                         </span>
+                        <div className="mr-auto flex gap-1">
+                          <motion.button whileTap={{ scale: 0.85 }}
+                            onClick={() => onEdit?.(v)}
+                            className="rounded-md border px-1.5 py-0.5 text-[8px]"
+                            style={{ borderColor: "var(--border)", color: "var(--info)" }}>
+                            ✏️ تعديل
+                          </motion.button>
+                          <motion.button whileTap={{ scale: 0.85 }}
+                            onClick={() => onDelete?.(v.id)}
+                            className="rounded-md border px-1.5 py-0.5 text-[8px]"
+                            style={{ borderColor: "var(--border)", color: "var(--danger)" }}>
+                            🗑️
+                          </motion.button>
+                        </div>
                       </div>
 
                       {/* Services */}
                       <div className="flex flex-wrap gap-1 mb-1.5">
-                        {servicesList.map((s, i) => (
-                          <span key={i} className="rounded-md px-1.5 py-0.5 text-[9px]" style={{ backgroundColor: "rgba(var(--accent-rgb), 0.08)", color: "var(--accent)" }}>
-                            {s}
-                          </span>
-                        ))}
+                        {servicesList.map((s, i) => {
+                          const p = servicePrices[s?.replace(/ × \d+ أيام$/, "")];
+                          return (
+                            <span key={i} className="rounded-md px-1.5 py-0.5 text-[9px] flex items-center gap-1" style={{ backgroundColor: "rgba(var(--accent-rgb), 0.08)", color: "var(--accent)" }}>
+                              {s}
+                              {p != null && <span className="text-[7px] opacity-70" style={{ color: "var(--accent-dark)" }}>({p} ج.م)</span>}
+                            </span>
+                          );
+                        })}
                       </div>
 
                       {/* Weight + Notes + Audio */}
