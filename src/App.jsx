@@ -776,6 +776,7 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
               onPriceChange={changePrice} onQtyChange={changeQty} onUndo={undoLast}
               onServicesChange={setServices} />
 
+            <AppointmentsList appointments={appointments} onRemind={remindWA} onComplete={completeAppointment} onDelete={deleteAppointment} />
             <VisitHistory client={client} visits={visits} onVisitClick={setVisitDetail}
               onTimeline={client ? () => setMedicalTimelineClient(client) : null} />
             {client && (
