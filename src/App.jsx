@@ -249,7 +249,7 @@ export default function App() {
           setVisits((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); vs.value.data.filter(v => v.name).map(v => ({ ...v, status: v.status || (v.debt > 0 ? "عليه مديونية" : "مدفوع بالكامل ✓") })).forEach(v => { const existing = m.get(v.id); if (!existing) { m.set(v.id, v); } else if (!existing.name && v.name) { m.set(v.id, { ...existing, name: v.name, animal: v.animal }); } }); return Array.from(m.values()); });
         }
         if (ap.status === "fulfilled" && ap.value.data?.length) {
-          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap.value.data.map(a => ({ ...a, status: a.status || "pending" })).forEach(i => { const existing = m.get(i.id); if (!existing) console.log("➕ merged appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
+          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap.value.data.forEach(i => { const existing = m.get(i.id); if (!existing) console.log("➕ merged appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
         }
         if (sv.status === "fulfilled" && sv.value.data?.length) {
           setServices((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); const add = sv.value.data.filter(i => !m.has(i.id)); console.log("➕ merged services:", add.length); add.forEach(i => m.set(i.id, i)); return Array.from(m.values()); });
@@ -261,7 +261,7 @@ export default function App() {
             const key = v.date + "|" + v.total + "|" + (v.services || "");
             const existing = seen.get(key);
             if (!existing) { seen.set(key, v); return; }
-            const prefer = v.name && v.animal ? v : existing.name && existing.animal ? existing : v.id < existing.id ? v : existing;
+            const prefer = v.debt === 0 ? v : existing.debt === 0 ? existing : v.name && v.animal ? v : existing.name && existing.animal ? existing : v.id < existing.id ? v : existing;
             seen.set(key, prefer);
           });
           if (seen.size < prev.length) {
@@ -288,7 +288,7 @@ export default function App() {
           setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); cl2.value.data.forEach(i => { const existing = m.get(i.id); if (existing && existing.debt > 0 && !i.debt) m.set(i.id, { ...existing, debt: 0 }); }); return Array.from(m.values()); });
         }
         if (ap2.status === "fulfilled" && ap2.value.data?.length) {
-          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap2.value.data.map(a => ({ ...a, status: a.status || "pending" })).forEach(i => { const existing = m.get(i.id); if (!existing) console.log("📅 auto-synced new appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
+          setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap2.value.data.forEach(i => { const existing = m.get(i.id); if (!existing) console.log("📅 auto-synced new appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
         }
       } catch (e) {}
     }, 20000);
@@ -357,10 +357,10 @@ export default function App() {
     if (!quickFUDate) { show("⚠️ اختر تاريخ المتابعة"); return; }
     const appId = Date.now();
     const c = clients.find((x) => x.name === name && x.animal === animal);
-    const newApp = { id: appId, clientId: c?.id || "", name, animal, date: quickFUDate, time: quickFUTime || "", reason: quickFUReason || "متابعة", status: "pending" };
+    const newApp = { id: appId, clientid: c?.id || null, name, animal, date: quickFUDate, time: quickFUTime || "", reason: quickFUReason || "متابعة" };
     setAppointments((p) => [newApp, ...p]);
     const { error } = await supabase.from("appointments").insert([newApp]);
-    if (error) console.error("❌ follow-up insert error:", error);
+    if (error) console.error("🚨 خطأ سوبابيز الحقيقي هو:", error);
     setShowQuickFollowUp(false);
     setQuickFUDate(""); setQuickFUTime(""); setQuickFUReason("");
     show("✅ تم إضافة موعد المتابعة");
@@ -445,10 +445,10 @@ export default function App() {
       setClients((p) => p.map((c) => (c.id === selectedClientId ? { ...c, debt, weight } : c)));
       if (followUpDate) {
         const appId = Date.now();
-        const newApp = { id: appId, clientId: client.id, name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة", status: "pending" };
+        const newApp = { id: appId, clientid: client.id, name: client.name, animal: client.animal, date: followUpDate, time: followUpTime || "", reason: followUpReason || "متابعة" };
         setAppointments((p) => [newApp, ...p]);
         const { error } = await supabase.from("appointments").insert([newApp]);
-        if (error) console.error("❌ appointment insert error:", error);
+        if (error) console.error("🚨 خطأ سوبابيز الحقيقي هو:", error);
       }
       setSelected([]); setDiscount(0); setPaid(0); setNotes("");
       setVisitWeight(""); setAudioBlob(null);
