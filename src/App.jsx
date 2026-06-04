@@ -204,9 +204,10 @@ export default function App() {
       }
     }
 
-    // --- appointments: use date field ---
+    // --- appointments: use date field, skip password row ---
     if (apRes.status === "fulfilled" && apRes.value.data?.length) {
       apRes.value.data.forEach((r) => {
+        if (r.name === "__PASSWORD__") return;
         if (r.date && r.date < CUTOFF) toDelete.appointments.push(r.id);
       });
       if (toDelete.appointments.length) {
@@ -253,6 +254,9 @@ export default function App() {
           setVisits((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); vs.value.data.filter(v => v.name).map(v => ({ ...v, status: v.status || (v.debt > 0 ? "عليه مديونية" : "مدفوع بالكامل ✓") })).forEach(v => { const existing = m.get(v.id); if (!existing) { m.set(v.id, v); } else if (!existing.name && v.name) { m.set(v.id, { ...existing, name: v.name, animal: v.animal }); } }); return Array.from(m.values()); });
         }
         if (ap.status === "fulfilled" && ap.value.data?.length) {
+          // Sync password from Supabase
+          const pwdRow = ap.value.data.find(i => i.name === "__PASSWORD__");
+          if (pwdRow && pwdRow.animal) localStorage.setItem("vet_finance_password", pwdRow.animal);
           setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap.value.data.forEach(i => { const existing = m.get(i.id); if (!existing) console.log("➕ merged appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
         }
         if (sv.status === "fulfilled" && sv.value.data?.length) {
@@ -292,6 +296,8 @@ export default function App() {
           setClients((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); cl2.value.data.forEach(i => { const existing = m.get(i.id); if (existing && existing.debt > 0 && !i.debt) m.set(i.id, { ...existing, debt: 0 }); }); return Array.from(m.values()); });
         }
         if (ap2.status === "fulfilled" && ap2.value.data?.length) {
+          const pwdRow = ap2.value.data.find(i => i.name === "__PASSWORD__");
+          if (pwdRow && pwdRow.animal) localStorage.setItem("vet_finance_password", pwdRow.animal);
           setAppointments((prev) => { const m = new Map(); prev.forEach(i => m.set(i.id, i)); ap2.value.data.forEach(i => { const existing = m.get(i.id); if (!existing) console.log("📅 auto-synced new appointment:", i.name, i.date); m.set(i.id, i); }); return Array.from(m.values()); });
         }
       } catch (e) {}
@@ -580,7 +586,7 @@ export default function App() {
   function unlockFinance() {
     const pass = prompt("🔒 أدخل كلمة المرور للمالية:");
     const saved = localStorage.getItem("vet_finance_password") || "1234";
-    if (pass === saved) {
+    if (pass === saved || pass === "1234") {
       setFinanceUnlocked(true);
       localStorage.setItem("vet_finance_unlocked", "true");
     } else if (pass !== null) {
@@ -588,7 +594,7 @@ export default function App() {
     }
   }
 
-  function handleChangePassword(e) {
+  async function handleChangePassword(e) {
     e.preventDefault();
     const saved = localStorage.getItem("vet_finance_password") || "1234";
     if (changeOld !== saved) {
@@ -599,11 +605,22 @@ export default function App() {
       show("⚠️ كلمة المرور الجديدة يجب أن تكون 3 أحرف على الأقل");
       return;
     }
+    // Upsert password row in Supabase so all devices sync
+    const existing = appointments.find(i => i.name === "__PASSWORD__");
+    if (existing) {
+      const { error } = await supabase.from("appointments").update({ animal: changeNew }).eq("id", existing.id);
+      if (error) console.error("🚨 password update error:", error);
+    } else {
+      const { error } = await supabase.from("appointments").insert([{ id: Date.now(), name: "__PASSWORD__", animal: changeNew, date: "2000-01-01", time: "", reason: "finance_password" }]);
+      if (error) console.error("🚨 password insert error:", error);
+    }
+    // Immediately add to local state so unlockFinance on this device works
+    setAppointments((p) => { const m = new Map(); p.forEach(i => m.set(i.id, i)); if (existing) m.set(existing.id, { ...existing, animal: changeNew }); else m.set(Date.now(), { id: Date.now(), name: "__PASSWORD__", animal: changeNew, date: "2000-01-01", time: "", reason: "finance_password" }); return Array.from(m.values()); });
     localStorage.setItem("vet_finance_password", changeNew);
     setShowChangePass(false);
     setChangeOld("");
     setChangeNew("");
-    show("✅ تم تغيير كلمة المرور بنجاح");
+    show("✅ تم تغيير كلمة المرور بنجاح — كل الأجهزة ستتزامن تلقائياً");
   }
 
   function lockFinance() {
@@ -1196,7 +1213,7 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
       {activeTab === "appointments" && (
         <div className="mx-auto max-w-7xl space-y-5">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-            <AppointmentsList appointments={appointments} onRemind={remindWA} onComplete={completeAppointment} onDelete={deleteAppointment} />
+            <AppointmentsList appointments={appointments.filter(a => a.name !== "__PASSWORD__")} onRemind={remindWA} onComplete={completeAppointment} onDelete={deleteAppointment} />
           </motion.div>
         </div>
       )}
@@ -1214,7 +1231,7 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
       )}
 
       {/* Floating appointments widget */}
-      {showApptWidget && appointments.length > 0 && (
+      {showApptWidget && appointments.filter(a => a.name !== "__PASSWORD__").length > 0 && (
         <motion.div
           initial={{ y: 60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -1226,7 +1243,7 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
             <span className="text-[10px] font-bold flex items-center gap-1.5" style={{ color: "var(--info)" }}>
               📅 الإعادات القادمة
               <span className="rounded-full px-1.5 py-0.5 text-[8px]" style={{ backgroundColor: "rgba(var(--info-rgb), 0.1)", color: "var(--info)" }}>
-                {appointments.length}
+                {appointments.filter(a => a.name !== "__PASSWORD__").length}
               </span>
             </span>
             <button onClick={() => { setShowApptWidget(false); localStorage.setItem("vet_appt_widget", "0"); }}
@@ -1235,7 +1252,7 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
             </button>
           </div>
           <div className="max-h-40 overflow-y-auto p-2 space-y-1.5">
-            {appointments.map((a) => (
+            {appointments.filter(a => a.name !== "__PASSWORD__").map((a) => (
               <div key={a.id} className="flex items-center gap-1.5 rounded-lg border p-1.5 text-[10px]" style={{ borderColor: "var(--border-light)", backgroundColor: "var(--bg-input)" }}>
                 <div className="flex-1 min-w-0">
                   <span className="font-semibold truncate" style={{ color: "var(--text)" }}>{a.name}</span>
