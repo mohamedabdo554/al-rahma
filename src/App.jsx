@@ -78,6 +78,9 @@ export default function App() {
   const [selectedDoctor, setSelectedDoctor] = useState(doctors[0] || "د. عبدالرحمن");
   const [expenses, setExpenses] = useState([]);
   const [financeUnlocked, setFinanceUnlocked] = useState(() => localStorage.getItem("vet_finance_unlocked") === "true");
+  const [showChangePass, setShowChangePass] = useState(false);
+  const [changeOld, setChangeOld] = useState("");
+  const [changeNew, setChangeNew] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [showApptWidget, setShowApptWidget] = useState(() => localStorage.getItem("vet_appt_widget") !== "0");
 
@@ -576,12 +579,31 @@ export default function App() {
 
   function unlockFinance() {
     const pass = prompt("🔒 أدخل كلمة المرور للمالية:");
-    if (pass === "1234") {
+    const saved = localStorage.getItem("vet_finance_password") || "1234";
+    if (pass === saved) {
       setFinanceUnlocked(true);
       localStorage.setItem("vet_finance_unlocked", "true");
     } else if (pass !== null) {
       show("⚠️ كلمة المرور غير صحيحة");
     }
+  }
+
+  function handleChangePassword(e) {
+    e.preventDefault();
+    const saved = localStorage.getItem("vet_finance_password") || "1234";
+    if (changeOld !== saved) {
+      show("⚠️ كلمة المرور القديمة غير صحيحة");
+      return;
+    }
+    if (changeNew.length < 3) {
+      show("⚠️ كلمة المرور الجديدة يجب أن تكون 3 أحرف على الأقل");
+      return;
+    }
+    localStorage.setItem("vet_finance_password", changeNew);
+    setShowChangePass(false);
+    setChangeOld("");
+    setChangeNew("");
+    show("✅ تم تغيير كلمة المرور بنجاح");
   }
 
   function lockFinance() {
@@ -941,12 +963,49 @@ onSendFollowUpWA={activeTab !== "pharmacy" ? () => {
                 <h2 className="text-xs font-bold flex items-center gap-2" style={{ color: "var(--accent)" }}>
                   💰 الماليات
                 </h2>
-                <button onClick={lockFinance}
-                  className="rounded-lg border px-3 py-1.5 text-[9px]"
-                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-                  🔒 إغلاق
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={() => setShowChangePass(true)}
+                    className="rounded-lg border px-3 py-1.5 text-[9px]"
+                    style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                    🔑 تغيير كلمة المرور
+                  </button>
+                  <button onClick={lockFinance}
+                    className="rounded-lg border px-3 py-1.5 text-[9px]"
+                    style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                    🔒 إغلاق
+                  </button>
+                </div>
               </div>
+
+              {showChangePass && (
+                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                  className="rounded-2xl border p-5 max-w-sm" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-card)" }}>
+                  <h3 className="text-xs font-bold mb-4" style={{ color: "var(--text)" }}>🔑 تغيير كلمة المرور</h3>
+                  <form onSubmit={handleChangePassword} className="space-y-3">
+                    <input type="password" placeholder="كلمة المرور القديمة" value={changeOld}
+                      onChange={(e) => setChangeOld(e.target.value)}
+                      className="w-full rounded-xl border p-2.5 text-xs outline-none"
+                      style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+                    <input type="password" placeholder="كلمة المرور الجديدة" value={changeNew}
+                      onChange={(e) => setChangeNew(e.target.value)}
+                      className="w-full rounded-xl border p-2.5 text-xs outline-none"
+                      style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)", color: "var(--text)" }} />
+                    <div className="flex gap-2">
+                      <motion.button whileTap={{ scale: 0.95 }} type="submit"
+                        className="flex-1 rounded-xl py-2.5 text-xs font-bold text-white"
+                        style={{ background: "linear-gradient(135deg, #6366f1, #4338ca)" }}>
+                        ✅ حفظ
+                      </motion.button>
+                      <motion.button whileTap={{ scale: 0.95 }} type="button"
+                        onClick={() => { setShowChangePass(false); setChangeOld(""); setChangeNew(""); }}
+                        className="rounded-xl border px-5 py-2.5 text-xs font-semibold"
+                        style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                        إلغاء
+                      </motion.button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
 
               <StatsCards visits={visits} clients={clients} />
               <Suspense fallback={<div className="h-32" />}><RevenueChart visits={visits} /></Suspense>

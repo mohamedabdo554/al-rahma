@@ -136,8 +136,9 @@ export default function PharmacyDashboard() {
   const [subTab, setSubTab] = useState("pos");
   const [financeUnlocked, setFinanceUnlocked] = useState(() => localStorage.getItem("vet_ph_finance_unlocked") === "true");
   function unlockFinance() {
+    const saved = localStorage.getItem("vet_finance_password") || "1234";
     const p = prompt("🔒 أدخل كلمة المرور للمالية:");
-    if (p === "1234") { setFinanceUnlocked(true); setSubTab("finance"); localStorage.setItem("vet_ph_finance_unlocked", "true"); }
+    if (p === saved) { setFinanceUnlocked(true); setSubTab("finance"); localStorage.setItem("vet_ph_finance_unlocked", "true"); }
     else alert("❌ كلمة المرور خطأ");
   }
   function lockFinance() {
